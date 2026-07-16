@@ -772,6 +772,7 @@ class App {
       case 'game': return this.gameHTML();
       case 'search': return this.searchHTML();
       case 'smartSearch': return this.smartSearchHTML();
+      case 'shop': return this.shopHTML();
       default: return this.homeHTML();
     }
   }
@@ -833,6 +834,7 @@ class App {
         ${this.modeBtn('flash','🃏','单词闪卡','翻转记忆+发音','pink')}
         ${this.modeBtn('game','🎮','练习挑战','多邻国风格闯关','green')}
         ${this.smartSearchBtn()}
+        ${this.shopBtn()}
       </div>
 
       <h3 class="font-bold text-gray-700 dark:text-gray-300 mb-3">📂 全部单元</h3>
@@ -934,6 +936,15 @@ class App {
     </button>`;
   }
 
+  shopBtn() {
+    const stars = load('stars', 0);
+    return `<button onclick="app.goShop()" class="card-hover bg-red-50 dark:bg-red-900/30 rounded-xl shadow p-4 text-center border-b-4 border-red-400">
+      <div class="text-3xl mb-1 flex justify-center">🛒</div>
+      <div class="font-bold text-red-700 dark:text-red-300 text-sm">商店</div>
+      <div class="text-xs text-gray-400 dark:text-gray-500">⭐ ${stars} 星星</div>
+    </button>`;
+  }
+
   // ============================================================
   // UNIT SELECT
   // ============================================================
@@ -970,6 +981,11 @@ class App {
     this.search.results = [];
     this.search.selectedWord = null;
     this.page = 'smartSearch';
+    this.render();
+  }
+
+  goShop() {
+    this.page = 'shop';
     this.render();
   }
 
@@ -1315,22 +1331,24 @@ class App {
           </button>
         </div>
         <p class="text-xs text-gray-400 mt-2">💡 支持拼写自动修正和在线词典查询</p>
-        ${this.searchHistory.length > 0 ? `
-        <div class="flex items-center gap-2 mt-3">
-          <span class="text-xs text-gray-400">📜 历史记录：</span>
-          ${this.searchHistory.map(word => `
-            <button onclick="app.searchFromHistory('${word.replace(/'/g,"\\'")}')" class="bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 px-3 py-1 rounded-full text-xs btn-press">
-              ${word}
-            </button>
-          `).join('')}
-        </div>` : ''}
       </div>
 
       ${s.results.length === 0 ? `
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 text-center">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 text-center min-h-[300px]">
           <div class="text-6xl mb-4">🔍</div>
           <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100">智能搜索</h3>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">输入任意英语单词，我来帮你查找释义和发音</p>
+          ${this.searchHistory.length > 0 ? `
+          <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <h4 class="text-sm font-bold text-gray-500 dark:text-gray-400 mb-3">📜 搜索历史</h4>
+            <div class="flex flex-wrap justify-center gap-2">
+              ${this.searchHistory.map(word => `
+                <button onclick="app.searchFromHistory('${word.replace(/'/g,"\\'")}')" class="bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 px-4 py-2 rounded-xl text-sm font-bold btn-press hover:bg-sky-200 dark:hover:bg-sky-800/40 transition">
+                  ${word}
+                </button>
+              `).join('')}
+            </div>
+          </div>` : ''}
         </div>` : `
         <div class="space-y-3">
           ${s.results.map((w, i) => `
@@ -1363,6 +1381,111 @@ class App {
           `).join('')}
         </div>`}
     </main>`;
+  }
+
+  // ============================================================
+  // SHOP MODE
+  // ============================================================
+  shopHTML() {
+    const stars = load('stars', 0);
+    const items = [
+      { id:'heart', name:'❤️ 爱心', icon:'❤️', price:1, desc:'恢复1颗爱心，继续闯关！', action:'buyHeart' },
+      { id:'hearts', name:'❤️❤️ 爱心x3', icon:'❤️❤️❤️', price:2, desc:'恢复3颗爱心，畅玩不停！', action:'buyHearts' },
+      { id:'hint', name:'💡 提示卡', icon:'💡', price:3, desc:'闯关时可以获得1次提示', action:'buyHint' },
+      { id:'double', name:'⭐ 双倍星星', icon:'⭐⭐', price:5, desc:'下一关获得双倍星星奖励', action:'buyDouble' },
+    ];
+    return `
+    <header class="bg-gradient-to-r from-red-500 via-pink-500 to-rose-600 text-white px-4 py-3 shadow-lg sticky top-0 z-10">
+      <div class="max-w-lg mx-auto flex items-center gap-3">
+        <button onclick="app.goHome()" class="bg-white/20 px-3 py-1 rounded-lg btn-press">←</button>
+        <h1 class="text-lg font-bold flex items-center gap-2">🛒 商店</h1>
+        <div class="ml-auto bg-white/20 px-3 py-1 rounded-full flex items-center gap-1">
+          <span>⭐</span>
+          <span class="font-bold">${stars}</span>
+        </div>
+      </div>
+    </header>
+    <main class="max-w-lg mx-auto px-4 py-6">
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 mb-4">
+        <div class="flex items-center gap-2">
+          <span class="text-yellow-500 text-xl">⭐</span>
+          <div>
+            <h3 class="font-bold text-gray-800 dark:text-gray-100">星星商店</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">用闯关获得的星星兑换道具</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        ${items.map(item => `
+          <button onclick="app.${item.action}()" class="card-hover bg-white dark:bg-gray-800 rounded-xl shadow p-4 text-center border-b-4 border-red-400 btn-press">
+            <div class="text-4xl mb-2">${item.icon}</div>
+            <div class="font-bold text-gray-800 dark:text-gray-100 text-sm">${item.name}</div>
+            <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">${item.desc}</div>
+            <div class="mt-2 bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1">
+              <span>⭐</span> ${item.price}
+            </div>
+          </button>
+        `).join('')}
+      </div>
+
+      <div class="mt-6 bg-blue-50 dark:bg-blue-900/30 rounded-xl p-4">
+        <h3 class="font-bold text-blue-700 dark:text-blue-300 text-sm mb-2">📋 商店说明</h3>
+        <ul class="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+          <li>• 闯关成功可以获得星星奖励</li>
+          <li>• 爱心用完后无法继续闯关</li>
+          <li>• 需要在商店购买爱心恢复</li>
+          <li>• 提示卡和双倍星星仅限下一关使用</li>
+        </ul>
+      </div>
+    </main>`;
+  }
+
+  buyHeart() {
+    this.buyItem(1, 'heart', () => {
+      this.game.hearts++;
+      save('gameHearts', this.game.hearts);
+      this.showToast('❤️ 购买成功！已恢复1颗爱心', 'success');
+      this.render();
+    });
+  }
+
+  buyHearts() {
+    this.buyItem(2, 'hearts', () => {
+      this.game.hearts = (this.game.hearts || 0) + 3;
+      save('gameHearts', this.game.hearts);
+      this.showToast('❤️❤️❤️ 购买成功！已恢复3颗爱心', 'success');
+      this.render();
+    });
+  }
+
+  buyHint() {
+    this.buyItem(3, 'hint', () => {
+      let hints = load('hints', 0);
+      hints++;
+      save('hints', hints);
+      this.showToast('💡 购买成功！获得1张提示卡', 'success');
+      this.render();
+    });
+  }
+
+  buyDouble() {
+    this.buyItem(5, 'double', () => {
+      save('doubleStars', true);
+      this.showToast('⭐⭐ 购买成功！下一关获得双倍星星', 'success');
+      this.render();
+    });
+  }
+
+  buyItem(price, itemName, onSuccess) {
+    let stars = load('stars', 0);
+    if (stars < price) {
+      this.showToast('⭐ 星星不足！请先闯关获得更多星星', 'error');
+      return;
+    }
+    stars -= price;
+    save('stars', stars);
+    onSuccess();
   }
 
   // ============================================================
@@ -1732,6 +1855,12 @@ class App {
   // GAME MODE
   // ============================================================
   startGame(level = null) {
+    const savedHearts = load('gameHearts', 5);
+    if (savedHearts <= 0) {
+      this.showToast('❤️ 爱心不足！请前往商店购买爱心', 'error');
+      return;
+    }
+    
     this.page='game';
     const allTypes = ['choose','listen','match','spell','order'];
     const ws = this.getWords();
@@ -1748,7 +1877,7 @@ class App {
     const currentLevel = level || (this.unitId ? units.findIndex(u=>u.id===this.unitId)+1 : 0);
     
     this.game = {
-      mode:'game', level:currentLevel, hearts:5, xp:0, combo:0, maxCombo:0,
+      mode:'game', level:currentLevel, hearts:savedHearts, xp:0, combo:0, maxCombo:0,
       total:totalQs, correct:0, qIdx:0, questions,
       curr:questions[0], selected:null, result:null, finished:false, wrongWords:[],
       lockedLevels
@@ -1830,6 +1959,13 @@ class App {
               <div class="text-xs text-gray-500 dark:text-gray-400">最高连击</div>
             </div>
           </div>
+          ${acc >= 60 ? `
+          <div class="bg-yellow-100 dark:bg-yellow-900/30 p-4 rounded-2xl mb-4">
+            <div class="text-2xl font-bold text-yellow-600 flex items-center justify-center gap-2">
+              ⭐ +${Math.floor(acc/20)} ${load('doubleStars', false) ? '×2' : ''}
+            </div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">获得星星奖励</div>
+          </div>` : ''}
           <div class="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-xl mb-6">
             <p class="text-sm text-purple-600 dark:text-purple-400">🔥 连续学习 ${streak} 天 · 累计 ${xp} XP</p>
           </div>
@@ -2107,6 +2243,18 @@ class App {
     g.qIdx++;
     if (g.hearts <= 0 || g.qIdx >= g.total) {
       g.finished = true;
+      save('gameHearts', g.hearts);
+      const acc = Math.round(g.correct / g.total * 100);
+      if (acc >= 60) {
+        let stars = load('stars', 0);
+        let earned = Math.floor(acc / 20);
+        if (load('doubleStars', false)) {
+          earned *= 2;
+          save('doubleStars', false);
+        }
+        stars += earned;
+        save('stars', stars);
+      }
     } else {
       g.curr = g.questions[g.qIdx];
       g.result = null;
