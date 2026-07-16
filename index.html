@@ -792,21 +792,15 @@ class App {
 
     return `
     <header class="bg-gradient-to-r from-green-500 via-emerald-500 to-teal-600 text-white px-4 py-3 sticky top-0 z-10 shadow-lg">
-      <div class="max-w-lg mx-auto flex items-center gap-2">
-        <h1 class="text-lg font-bold flex-shrink-0">📖 单词冒险</h1>
-        <div class="flex-1 relative">
-          <input type="text" id="quickSearch" placeholder="🔍 输入任意英语单词..." 
-            class="w-full px-4 py-2 pl-9 bg-white/20 rounded-full text-white text-sm placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
-            onkeydown="if(event.key==='Enter')app.quickSearch()">
-          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 text-sm">🔍</span>
+      <div class="max-w-lg mx-auto flex items-center justify-between">
+        <h1 class="text-lg font-bold">📖 单词冒险 <span class="text-xs opacity-70 font-normal">Reading Explorer</span></h1>
+        <div class="flex items-center gap-2 text-sm">
+          <button onclick="app.toggleDark()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="深色模式">${this.dark?'☀️':'🌙'}</button>
+          <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="切换发音模式">${this.childVoice?'👶':'🔊'}</button>
+          <span class="bg-white/20 px-2 py-1 rounded-full text-xs">📚 ${units.length}单元</span>
+          <span class="bg-white/20 px-2 py-1 rounded-full text-xs">🔥 ${streak}天</span>
+          <span class="bg-white/20 px-2 py-1 rounded-full">⭐ ${xp} XP</span>
         </div>
-        <button onclick="app.toggleDark()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="深色模式">${this.dark?'☀️':'🌙'}</button>
-        <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="切换发音模式">${this.childVoice?'👶':'🔊'}</button>
-      </div>
-      <div class="max-w-lg mx-auto flex items-center justify-end gap-2 mt-2 text-xs">
-        <span class="bg-white/20 px-2 py-1 rounded-full">📚 ${units.length}单元</span>
-        <span class="bg-white/20 px-2 py-1 rounded-full">🔥 ${streak}天</span>
-        <span class="bg-white/20 px-2 py-1 rounded-full">⭐ ${xp} XP</span>
       </div>
     </header>
     <main class="max-w-lg mx-auto px-4 py-6">
@@ -1251,13 +1245,21 @@ class App {
     if(!w) return '<div class="p-8 text-center">暂无单词</div>';
     return `
     <header class="bg-gradient-to-r ${unitGrad(u)} text-white px-4 py-3 shadow-lg sticky top-0 z-10">
-      <div class="max-w-lg mx-auto flex items-center gap-3">
-        <button onclick="app.goHome()" class="bg-white/20 px-3 py-1 rounded-lg btn-press">←</button>
-        <h1 class="text-lg font-bold">📚 单词学习</h1>
-        ${u?`<span class="text-xs bg-white/20 px-2 py-1 rounded">${u.icon} ${u.name}</span>`:''}
-        <span class="ml-auto text-sm">${this.learnIdx+1}/${ws.length}</span>
-        <button onclick="app.toggleDark()" class="bg-white/20 px-2 py-1 rounded-full text-sm btn-press">${this.dark?'☀️':'🌙'}</button>
-        <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full text-sm btn-press" title="发音模式">${this.childVoice?'👶':'🔊'}</button>
+      <div class="max-w-lg mx-auto flex items-center gap-2">
+        <button onclick="app.goHome()" class="bg-white/20 px-3 py-1 rounded-lg btn-press flex-shrink-0">←</button>
+        <h1 class="text-lg font-bold flex-shrink-0">📚 单词学习</h1>
+        ${u?`<span class="text-xs bg-white/20 px-2 py-1 rounded flex-shrink-0">${u.icon} ${u.name}</span>`:''}
+        <div class="flex-1 relative">
+          <input type="text" id="quickSearch" placeholder="智能搜索..." 
+            class="w-full px-4 py-2 pl-9 bg-white/20 rounded-full text-white text-sm placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+            onkeydown="if(event.key==='Enter')app.quickSearch()">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+        </div>
+        <span class="text-sm flex-shrink-0">${this.learnIdx+1}/${ws.length}</span>
+        <button onclick="app.toggleDark()" class="bg-white/20 px-2 py-1 rounded-full text-sm btn-press flex-shrink-0">${this.dark?'☀️':'🌙'}</button>
+        <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full text-sm btn-press flex-shrink-0" title="发音模式">${this.childVoice?'👶':'🔊'}</button>
       </div>
     </header>
     <main class="max-w-lg mx-auto px-4 py-6">
