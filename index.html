@@ -1025,6 +1025,24 @@ class App {
 
   goHome() {
     window.speechSynthesis?.cancel();
+    if (this.page === 'game' && !this.game.finished && this.game.qIdx > 0) {
+      const g = this.game;
+      const acc = Math.round(g.correct / g.qIdx * 100);
+      if (acc >= 60) {
+        let stars = load('stars', 0);
+        let earned = Math.floor(acc / 20);
+        if (load('doubleStars', false)) {
+          earned *= 2;
+          save('doubleStars', false);
+        }
+        stars += earned;
+        save('stars', stars);
+        save('gameHearts', g.hearts);
+        this.showToast(`⭐ 获得 ${earned} 颗星星！`, 'success');
+      } else {
+        save('gameHearts', g.hearts);
+      }
+    }
     this.page='home'; this.unitId=null; this.render();
   }
   goLearn(uid=null) { this.page='learn'; this.unitId=uid; this.learnIdx=0; this.render(); }
