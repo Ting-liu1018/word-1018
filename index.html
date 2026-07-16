@@ -748,6 +748,7 @@ class App {
         if (e.key === ' ') { e.preventDefault(); this.toggleRead(); }
       }
       if (this.page === 'game') {
+        if (e.target.tagName === 'INPUT') return;
         if (e.key === 'Enter' && this.game.result !== null) { this.nextQuestion(); }
       }
     });
@@ -2041,6 +2042,16 @@ class App {
     }
     this.saveWP(g.curr.word.w, correct);
     this.render();
+  }
+
+  focusSpellInput() {
+    setTimeout(() => {
+      const input = document.getElementById('spellInput');
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }, 100);
   }
 
   selectLetter(l, idx) {
