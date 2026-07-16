@@ -848,12 +848,43 @@ class App {
       <div class="mt-6 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-lg">
         <div class="flex items-center gap-2 mb-4">
           <div class="flex-1 relative">
-            <input type="text" id="searchInput" placeholder="🔍 搜索单词、中文意思或例句..." 
+            <input type="text" id="searchInput" placeholder="🔍 输入单词查询读音和拆分..." 
               class="w-full px-4 py-3 pl-10 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 dark:text-gray-200"
               onkeydown="if(event.key==='Enter')app.doSearch()">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
           </div>
-          <button onclick="app.doSearch()" class="bg-green-500 text-white px-4 py-3 rounded-xl font-bold btn-press">搜索</button>
+          <button onclick="app.doSearch()" class="bg-green-500 text-white px-4 py-3 rounded-xl font-bold btn-press">查询</button>
         </div>
+
+        ${this.search.results.length > 0 ? `
+        <div class="mb-4">
+          <div class="text-sm text-gray-500 dark:text-gray-400 mb-2">找到 ${this.search.results.length} 个单词</div>
+          <div class="space-y-2">
+            ${this.search.results.map((w) => `
+              <div class="bg-white dark:bg-gray-700 rounded-xl p-4 shadow">
+                <div class="flex items-start gap-3">
+                  <button onclick="speak('${w.w.replace(/'/g,"\\'")}')" class="bg-blue-500 text-white w-10 h-10 rounded-full flex items-center justify-center btn-press flex-shrink-0">🔊</button>
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                      <span class="font-bold text-blue-600 dark:text-blue-400 text-xl">${w.w}</span>
+                      <span class="text-gray-500 dark:text-gray-400">${w.p}</span>
+                      <span class="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full text-xs">${w.pos}</span>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-300 text-sm mt-1">${w.m}</p>
+                    <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2 mt-2">
+                      <span class="text-xs font-bold text-purple-400">🔗 音节拆分：</span>
+                      <span class="text-gray-700 dark:text-gray-200">${colorSyllables(w.parts)}</span>
+                    </div>
+                    <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-2 mt-1">
+                      <span class="text-xs font-bold text-green-400">🔤 例句：</span>
+                      <span class="text-gray-700 dark:text-gray-200 text-sm">${w.ex}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>` : ''}
 
         <div class="flex items-center justify-between mb-2">
           <h3 class="font-bold text-gray-700 dark:text-gray-300 text-sm">🎨 自然拼读颜色图例</h3>
