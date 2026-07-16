@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reading Explorer - 单词冒险</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: {} }
+    }
+  </script>
+  <style>
+    body { font-family: 'Segoe UI', 'Comic Sans MS', cursive, sans-serif; }
+    .card-hover { transition: all 0.3s; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+    .btn-press { transition: all 0.15s; }
+    .btn-press:active { transform: scale(0.95); }
+    .red-word { color: #DC2626; font-weight: bold; border-bottom: 2px dashed #DC2626; cursor: pointer; }
+    .red-word:hover { background: #FEE2E2; }
+    .flashcard-inner { position: relative; width: 100%; height: 280px; transition: transform 0.6s; transform-style: preserve-3d; }
+    .flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+    .flashcard-front, .flashcard-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 24px; }
+    .flashcard-back { transform: rotateY(180deg); }
+    @keyframes pop { 0% { transform: scale(0.8); opacity: 0; } 50% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+    .pop-in { animation: pop 0.4s ease; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+    .shake { animation: shake 0.3s; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .slide-up { animation: slideUp 0.3s ease; }
+    @keyframes wave { 0%{transform:scale(1);opacity:0.5} 100%{transform:scale(2.2);opacity:0} }
+    .sound-ring { position:absolute; inset:0; border-radius:50%; border:3px solid #60A5FA; animation:wave 1.2s ease-out infinite; }
+    .sound-ring:nth-child(2) { animation-delay:0.4s; }
+    .sound-ring:nth-child(3) { animation-delay:0.8s; }
+    @keyframes popIn { 0%{transform:scale(0);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
+    .pop-in-syl { animation: popIn 0.4s ease forwards; opacity:0; }
+    .pop-in-syl:nth-child(1) { animation-delay:0s; }
+    .pop-in-syl:nth-child(2) { animation-delay:0.1s; }
+    .pop-in-syl:nth-child(3) { animation-delay:0.2s; }
+    .pop-in-syl:nth-child(4) { animation-delay:0.3s; }
+    .pop-in-syl:nth-child(5) { animation-delay:0.4s; }
+    .pop-in-syl:nth-child(6) { animation-delay:0.5s; }
+    @keyframes glow { 0%,100%{box-shadow:0 0 5px rgba(59,130,246,0.3)} 50%{box-shadow:0 0 20px rgba(59,130,246,0.6)} }
+    .glow { animation: glow 2s ease-in-out infinite; }
+    /* Word emoji display */
+    .word-emoji { font-size: 4rem; line-height: 1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1)); }
+    @keyframes bounce-in { 0%{transform:scale(0) rotate(-15deg)} 60%{transform:scale(1.1) rotate(5deg)} 100%{transform:scale(1) rotate(0deg)} }
+    .bounce-in { animation: bounce-in 0.6s ease forwards; }
+    .progress-bar { transition: width 0.5s ease; }
+    .phonetic-rule { background: #FFFBEB; border-left: 4px solid #F59E0B; padding: 8px 12px; margin: 8px 0; border-radius: 0 8px 8px 0; }
+    @keyframes toastIn { 0%{transform:translateX(100%);opacity:0} 100%{transform:translateX(0);opacity:1} }
+    @keyframes toastOut { 0%{transform:translateX(0);opacity:1} 100%{transform:translateX(100%);opacity:0} }
+    .toast-in { animation: toastIn 0.3s ease; }
+    .toast-out { animation: toastOut 0.3s ease forwards; }
+    /* Fun decoration elements */
+    .unit-emoji-bg { font-size: 5rem; opacity: 0.08; position: absolute; right: -10px; top: -10px; pointer-events: none; }
+    .word-card { border-radius: 20px; overflow: hidden; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+    .float-anim { animation: float 3s ease-in-out infinite; }
+    @keyframes sparkle { 0%,100%{opacity:0.3;transform:scale(1)} 50%{opacity:1;transform:scale(1.15)} }
+    .sparkle { animation: sparkle 2s ease-in-out infinite; display: inline-block; }
+    @keyframes confetti-fall { 0%{transform:translateY(-10px) rotate(0deg);opacity:1} 100%{transform:translateY(60px) rotate(360deg);opacity:0} }
+    .confetti { animation: confetti-fall 1.5s ease-out forwards; display:inline-block; }
+    /* Soft gradient backgrounds */
+    .card-soft { background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(249,250,251,0.9)); backdrop-filter: blur(8px); }
+    .dark .card-soft { background: linear-gradient(135deg, rgba(31,41,55,0.95), rgba(17,24,39,0.9)); }
+    /* Dark mode adjustments */
+    .dark .phonetic-rule { background: #1F2937; border-left-color: #F59E0B; }
+    .dark .read-word-hl { background-color: #1E3A5F !important; }
+
+    /* Phonics syllable colors */
+    .syl-closed { color: #2563EB; }       /* blue — 闭音节 */
+    .syl-open { color: #DC2626; }         /* red — 开音节 */
+    .syl-magic-e { color: #16A34A; }      /* green — 魔法e */
+    .syl-r-control { color: #EA580C; }    /* orange — r控制 */
+    .syl-vowel-team { color: #CA8A04; }   /* yellow — 元音组合 */
+    .syl-special { color: #9333EA; }      /* purple — 特殊结尾 */
+
+    /* Dark mode syllable colors (lighter for dark bg) */
+    .dark .syl-closed { color: #60A5FA; }
+    .dark .syl-open { color: #F87171; }
+    .dark .syl-magic-e { color: #4ADE80; }
+    .dark .syl-r-control { color: #FB923C; }
+    .dark .syl-vowel-team { color: #FACC15; }
+    .dark .syl-special { color: #C084FC; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen dark:bg-gray-900 dark:text-gray-100">
+<div id="app"></div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const units = [
+  { id:'u1', name:'Unit 1', title:'Mysteries', sub:'未解之谜', icon:'🔮', color:'purple',
+    words:[
+      {w:'mystery',p:'/ˈmɪstri/',m:'谜；神秘',pos:'n.',ex:'It is a great mystery.',rule:'y发/ɪ/音，st发/st/，ery发/əri/',parts:'mys-ter-y',tips:'神秘的事情'},
+      {w:'visitor',p:'/ˈvɪzɪtər/',m:'访客',pos:'n.',ex:'We have a visitor today.',rule:'vi发/ˈvɪ/，si发/zɪ/，tor发/tər/',parts:'vis-i-tor',tips:'来拜访的人'},
+      {w:'appear',p:'/əˈpɪər/',m:'出现',pos:'v.',ex:'A star appears in the sky.',rule:'ap发/ə/，pear发/ˈpɪər/',parts:'ap-pear',tips:'从看不见到看得见'},
+      {w:'disappear',p:'/ˌdɪsəˈpɪər/',m:'消失',pos:'v.',ex:'The ship disappeared.',rule:'dis发/dɪs/，ap发/ə/，pear发/ˈpɪər/',parts:'dis-ap-pear',tips:'dis是否定前缀，表示不'},
+      {w:'ancient',p:'/ˈeɪnʃənt/',m:'古代的',pos:'adj.',ex:'Ancient cities are amazing.',rule:'an发/ˈeɪn/，cient发/ʃənt/',parts:'an-cient',tips:'很久以前的'},
+      {w:'legend',p:'/ˈledʒənd/',m:'传说',pos:'n.',ex:'This is a famous legend.',rule:'le发/ˈle/，gend发/dʒənd/',parts:'leg-end',tips:'古老的故事'},
+      {w:'explore',p:'/ɪkˈsplɔːr/',m:'探索',pos:'v.',ex:'We explore the cave.',rule:'ex发/ɪk/，plore发/ˈsplɔːr/',parts:'ex-plore',tips:'去发现新事物'},
+      {w:'discover',p:'/dɪˈskʌvər/',m:'发现',pos:'v.',ex:'Scientists discover new things.',rule:'dis发/dɪ/，cover发/ˈskʌvər/',parts:'dis-cov-er',tips:'第一次找到'}
+    ],
+    text:[
+      'In 2017, a mysterious visitor appeared in the sky above Hawaii. It was a strange object that moved very fast.',
+      'Scientists called it "Oumuamua." It was the first object from another star system to visit our solar system.',
+      'People have many questions. Was it a rock? Was it a comet? The mystery remains. Some things are hard to explain, but that makes them exciting to explore.'
+    ],
+    rules:[
+      {title:'y的发音', desc:'字母y在单词开头通常发/j/（如yes），在单词中间或结尾通常发/ɪ/（如mystery）或/aɪ/（如my）'},
+      {title:'ea组合', desc:'ea通常发/iː/（如read）或/e/（如head），在appear中发/ɪər/'},
+      {title:'dis-前缀', desc:'dis-是否定前缀，表示"不"或"相反"'}
+    ]
+  },
+  { id:'u2', name:'Unit 2', title:'Eating Extremes', sub:'极限饮食', icon:'🌶️', color:'red',
+    words:[
+      {w:'competition',p:'/ˌkɒmpəˈtɪʃn/',m:'比赛',pos:'n.',ex:'I won the competition.',rule:'com发/kɒm/，pe发/pə/，ti发/ˈtɪ/，tion发/ʃn/',parts:'com-pe-ti-tion',tips:'大家一起比一比'},
+      {w:'record',p:'/ˈrekɔːrd/',m:'记录',pos:'n.',ex:'He broke the world record.',rule:'re发/ˈre/，cord发/kɔːrd/',parts:'re-cord',tips:'保持下来的东西'},
+      {w:'spicy',p:'/ˈspaɪsi/',m:'辣的',pos:'adj.',ex:'This chili is very spicy.',rule:'spi发/ˈspaɪ/，cy发/si/',parts:'spi-cy',tips:'有辣椒味道的'},
+      {w:'taste',p:'/teɪst/',m:'味道',pos:'n./v.',ex:'The soup tastes good.',rule:'ta发/teɪ/，ste发/st/',parts:'taste',tips:'用舌头感受'},
+      {w:'challenge',p:'/ˈtʃælɪndʒ/',m:'挑战',pos:'n.',ex:'It is a big challenge.',rule:'chal发/ˈtʃæl/，lenge发/ɪndʒ/',parts:'chal-lenge',tips:'很难的任务'},
+      {w:'delicious',p:'/dɪˈlɪʃəs/',m:'美味的',pos:'adj.',ex:'The cake is delicious.',rule:'de发/dɪ/，li发/ˈlɪ/，cious发/ʃəs/',parts:'de-li-cious',tips:'很好吃的'},
+      {w:'painful',p:'/ˈpeɪnfl/',m:'痛苦的',pos:'adj.',ex:'Eating hot chili is painful.',rule:'pain发/ˈpeɪn/，ful发/fl/',parts:'pain-ful',tips:'让人疼的'},
+      {w:'flavor',p:'/ˈfleɪvər/',m:'风味',pos:'n.',ex:'I love the flavor of chocolate.',rule:'fla发/ˈfleɪ/，vor发/vər/',parts:'fla-vor',tips:'食物的味道'}
+    ],
+    text:[
+      'Speed eating is a popular competition. People try to eat as much food as possible in a short time.',
+      'The records are amazing. Someone ate 74 hot dogs in 10 minutes!',
+      'The Carolina Reaper is one of the hottest peppers in the world. Eating it is a painful challenge.'
+    ],
+    rules:[
+      {title:'tion发音', desc:'tion通常发/ʃn/或/tʃn/'},
+      {title:'-ful后缀', desc:'-ful是形容词后缀，表示"充满..."'},
+      {title:'sp发音', desc:'sp在单词开头通常发/sp/'}
+    ]
+  },
+  { id:'u3', name:'Unit 3', title:'Cool Jobs', sub:'酷炫工作', icon:'💼', color:'blue',
+    words:[
+      {w:'archaeologist',p:'/ˌɑːrkiˈɒlədʒɪst/',m:'考古学家',pos:'n.',ex:'An archaeologist digs for old things.',rule:'ar发/ˌɑːr/，chae发/ki/，olo发/ˈɒlə/，gist发/dʒɪst/',parts:'ar-chae-ol-o-gist',tips:'研究古代的专家'},
+      {w:'dig',p:'/dɪɡ/',m:'挖掘',pos:'v.',ex:'They dig in the sand.',rule:'dig发/dɪɡ/',parts:'dig',tips:'用工具挖地'},
+      {w:'camera',p:'/ˈkæmərə/',m:'相机',pos:'n.',ex:'I have a new camera.',rule:'cam发/ˈkæm/，era发/ərə/',parts:'cam-er-a',tips:'拍照的机器'},
+      {w:'photograph',p:'/ˈfəʊtəɡrɑːf/',m:'照片',pos:'n.',ex:'Take a photograph of the bird.',rule:'pho发/ˈfəʊ/，to发/tə/，graph发/ɡrɑːf/',parts:'pho-to-graph',tips:'用光画出来的'},
+      {w:'career',p:'/kəˈrɪər/',m:'职业',pos:'n.',ex:'What is your dream career?',rule:'ca发/kə/，reer发/ˈrɪər/',parts:'ca-reer',tips:'一生的工作'},
+      {w:'adventure',p:'/ədˈventʃər/',m:'冒险',pos:'n.',ex:'Life is an adventure.',rule:'ad发/əd/，ven发/ˈven/，ture发/tʃər/',parts:'ad-ven-ture',tips:'刺激的经历'},
+      {w:'professional',p:'/prəˈfeʃənl/',m:'专业的',pos:'adj.',ex:'She is a professional photographer.',rule:'pro发/prə/，fe发/ˈfe/，ssion发/ʃən/，al发/l/',parts:'pro-fes-sion-al',tips:'很厉害的'},
+      {w:'skill',p:'/skɪl/',m:'技能',pos:'n.',ex:'He has good skills.',rule:'skill发/skɪl/',parts:'skill',tips:'做事情的本事'},
+      {w:'patience',p:'/ˈpeɪʃns/',m:'耐心',pos:'n.',ex:'You need a lot of patience to be a photographer.',rule:'pa发/ˈpeɪ/，tience发/ʃns/，ti发/ʃ/',parts:'pa-tience',tips:'等待的能力'},
+      {w:'wildlife',p:'/ˈwaɪldlaɪf/',m:'野生动物',pos:'n.',ex:'He photographs wildlife in Africa.',rule:'wild发/ˈwaɪld/，life发/laɪf/，i-e发/aɪ/，i发/aɪ/',parts:'wild-life',tips:'野外的动物'},
+      {w:'ground',p:'/ɡraʊnd/',m:'地面',pos:'n.',ex:'Archaeologists dig in the ground.',rule:'ground发/ɡraʊnd/，ou发/aʊ/',parts:'ground',tips:'脚下的土地'},
+      {w:'past',p:'/pɑːst/',m:'过去',pos:'n.',ex:'We learn about the past from old things.',rule:'past发/pɑːst/，a发/ɑː/',parts:'past',tips:'以前的时间'}
+    ],
+    text:[
+      'An archaeologist has a cool job. They dig in the ground to find things from the past. Every day is an adventure!',
+      'A wildlife photographer also has an exciting career. They use a camera to take photographs of animals.',
+      'Both jobs are professional careers. They help us discover the world.'
+    ],
+    rules:[
+      {title:'ph发音', desc:'ph组合通常发/f/音，如photograph，phone'},
+      {title:'-ist后缀', desc:'-ist是名词后缀，表示"从事...的人"'},
+      {title:'ssion发音', desc:'ssion通常发/ʃən/'}
+    ]
+  },
+  { id:'u4', name:'Unit 4', title:'Shipwrecks', sub:'沉船', icon:'🚢', color:'cyan',
+    words:[
+      {w:'ship',p:'/ʃɪp/',m:'船',pos:'n.',ex:'The ship sailed away.',rule:'ship发/ʃɪp/',parts:'ship',tips:'在水上航行的'},
+      {w:'sink',p:'/sɪŋk/',m:'下沉',pos:'v.',ex:'The ship began to sink.',rule:'sink发/sɪŋk/',parts:'sink',tips:'往下沉'},
+      {w:'ocean',p:'/ˈəʊʃn/',m:'海洋',pos:'n.',ex:'The ocean is very deep.',rule:'o发/ˈəʊ/，cean发/ʃn/',parts:'o-cean',tips:'很大的海'},
+      {w:'deep',p:'/diːp/',m:'深的',pos:'adj.',ex:'The water is very deep here.',rule:'deep发/diːp/',parts:'deep',tips:'从上面到下面很远'},
+      {w:'wreck',p:'/rek/',m:'残骸',pos:'n.',ex:'They found a shipwreck.',rule:'wreck发/rek/',parts:'wreck',tips:'坏了的东西'},
+      {w:'dive',p:'/daɪv/',m:'潜水',pos:'v.',ex:'They dive to see the wreck.',rule:'dive发/daɪv/',parts:'dive',tips:'头朝下跳进水'},
+      {w:'explore',p:'/ɪkˈsplɔːr/',m:'探索',pos:'v.',ex:'We explore the underwater world.',rule:'ex发/ɪk/，plore发/ˈsplɔːr/',parts:'ex-plore',tips:'去发现'},
+      {w:'treasure',p:'/ˈtreʒər/',m:'宝藏',pos:'n.',ex:'They found treasure in the wreck.',rule:'trea发/ˈtre/，sure发/ʒər/',parts:'trea-sure',tips:'珍贵的东西'},
+      {w:'famous',p:'/ˈfeɪməs/',m:'著名的',pos:'adj.',ex:'The Titanic is a famous ship.',rule:'fa发/ˈfeɪ/，mous发/məs/，a发/eɪ/',parts:'fa-mous',tips:'很多人都知道的'},
+      {w:'bottom',p:'/ˈbɒtəm/',m:'底部',pos:'n.',ex:'The ship rests at the bottom of the ocean.',rule:'bot发/ˈbɒ/，tom发/təm/，o发/ɒ/',parts:'bot-tom',tips:'最下面'},
+      {w:'kilometer',p:'/ˈkɪləmiːtər/',m:'公里',pos:'n.',ex:'The wreck is four kilometers deep.',rule:'ki发/ˈkɪ/，lo发/lə/，me发/miː/，ter发/tər/',parts:'ki-lo-me-ter',tips:'一千米'},
+      {w:'rest',p:'/rest/',m:'停留；休息',pos:'v.',ex:'The Titanic rests on the ocean floor.',rule:'rest发/rest/，e发/e/',parts:'rest',tips:'安静地待着'}
+    ],
+    text:[
+      'In 1985, Robert Ballard found the Titanic! The famous ship sank in 1912.',
+      'The Titanic rests at the bottom of the ocean, nearly four kilometers deep.',
+      'Today, people can dive down to explore the wreck and sometimes find treasure.'
+    ],
+    rules:[
+      {title:'sh发音', desc:'sh组合发/ʃ/音，如ship，she，shop'},
+      {title:'nk发音', desc:'nk组合发/ŋk/，如sink，think'},
+      {title:'ea发音', desc:'ea在deep中发/iː/'}
+    ]
+  },
+  { id:'u5', name:'Unit 5', title:'Science Investigators', sub:'科学调查', icon:'🔬', color:'green',
+    words:[
+      {w:'disease',p:'/dɪˈziːz/',m:'疾病',pos:'n.',ex:'The disease spreads fast.',rule:'dis发/dɪ/，ease发/ˈziːz/',parts:'dis-ease',tips:'身体不舒服'},
+      {w:'detective',p:'/dɪˈtektɪv/',m:'侦探',pos:'n.',ex:'The detective solves crimes.',rule:'de发/dɪ/，tec发/ˈtek/，tive发/tɪv/',parts:'de-tec-tive',tips:'破案的人'},
+      {w:'crime',p:'/kraɪm/',m:'犯罪',pos:'n.',ex:'The police solve the crime.',rule:'crime发/kraɪm/',parts:'crime',tips:'做坏事'},
+      {w:'evidence',p:'/ˈevɪdəns/',m:'证据',pos:'n.',ex:'They found evidence at the scene.',rule:'e发/ˈe/，vi发/vɪ/，dence发/dəns/',parts:'ev-i-dence',tips:'证明的东西'},
+      {w:'investigate',p:'/ɪnˈvestɪɡeɪt/',m:'调查',pos:'v.',ex:'Police investigate the crime.',rule:'in发/ɪn/，ves发/ˈves/，ti发/tɪ/，gate发/ɡeɪt/',parts:'in-ves-ti-gate',tips:'仔细查'},
+      {w:'solve',p:'/sɒlv/',m:'解决',pos:'v.',ex:'Can you solve the mystery?',rule:'solve发/sɒlv/',parts:'solve',tips:'找到答案'},
+      {w:'clue',p:'/kluː/',m:'线索',pos:'n.',ex:'The detective found a clue.',rule:'clue发/kluː/',parts:'clue',tips:'帮助破案的'},
+      {w:'examine',p:'/ɪɡˈzæmɪn/',m:'检查',pos:'v.',ex:'The doctor examines the patient.',rule:'ex发/ɪɡ/，a发/ˈzæ/，mine发/mɪn/',parts:'ex-am-ine',tips:'仔细看'},
+      {w:'special',p:'/ˈspeʃl/',m:'特别的',pos:'adj.',ex:'A disease detective is a special doctor.',rule:'spe发/ˈspe/，cial发/ʃl/，c发/ʃ/，al发/l/',parts:'spe-cial',tips:'不一般的'},
+      {w:'scene',p:'/siːn/',m:'现场',pos:'n.',ex:'Scientists examine the scene of a crime.',rule:'scene发/siːn/，sc发/s/，e发/iː/，不发音e',parts:'scene',tips:'事情发生的地方'},
+      {w:'truth',p:'/truːθ/',m:'真相',pos:'n.',ex:'Every clue helps them find the truth.',rule:'truth发/truːθ/，tr发/tr/，u发/uː/，th发/θ/',parts:'truth',tips:'真实的情况'},
+      {w:'careful',p:'/ˈkeəfl/',m:'小心的',pos:'adj.',ex:'Scientists must be careful with evidence.',rule:'care发/ˈkeə/，ful发/fl/',parts:'care-ful',tips:'仔细的'}
+    ],
+    text:[
+      'A disease detective is a special doctor. They investigate mysterious diseases.',
+      'At the scene of a crime, scientists examine the area for evidence.',
+      'Every clue helps them solve the crime and find the truth.'
+    ],
+    rules:[
+      {title:'s发音', desc:'s在词尾通常发/s/或/z/，在disease中发/z/'},
+      {title:'-ive后缀', desc:'-ive是形容词后缀，表示"有...性质的"'},
+      {title:'ex发音', desc:'ex通常发/eks/或/ɪɡz/'}
+    ]
+  },
+  { id:'u6', name:'Unit 6', title:'Plants and Trees', sub:'植物和树木', icon:'🌳', color:'emerald',
+    words:[
+      {w:'plant',p:'/plænt/',m:'种植；植物',pos:'n./v.',ex:'We plant trees every year.',rule:'plant发/plænt/',parts:'plant',tips:'种在土里的'},
+      {w:'grow',p:'/ɡrəʊ/',m:'生长',pos:'v.',ex:'Plants grow in spring.',rule:'grow发/ɡrəʊ/',parts:'grow',tips:'从小变大'},
+      {w:'seed',p:'/siːd/',m:'种子',pos:'n.',ex:'A seed grows into a tree.',rule:'seed发/siːd/',parts:'seed',tips:'能长出植物的'},
+      {w:'forest',p:'/ˈfɒrɪst/',m:'森林',pos:'n.',ex:'The forest is full of trees.',rule:'for发/ˈfɒr/，est发/ɪst/',parts:'for-est',tips:'很多树的地方'},
+      {w:'attract',p:'/əˈtrækt/',m:'吸引',pos:'v.',ex:'Flowers attract bees.',rule:'at发/ə/，tract发/ˈtrækt/',parts:'at-tract',tips:'让东西过来'},
+      {w:'insect',p:'/ˈɪnsekt/',m:'昆虫',pos:'n.',ex:'An insect flies to the flower.',rule:'in发/ˈɪn/，sect发/sekt/',parts:'in-sect',tips:'六条腿的小动物'},
+      {w:'trap',p:'/træp/',m:'陷阱',pos:'n./v.',ex:'The plant traps insects.',rule:'trap发/træp/',parts:'trap',tips:'抓住东西的'},
+      {w:'nature',p:'/ˈneɪtʃər/',m:'自然',pos:'n.',ex:'Nature is beautiful.',rule:'na发/ˈneɪ/，ture发/tʃər/',parts:'na-ture',tips:'大自然'}
+    ],
+    text:[
+      'Planting for the Planet is about a man who planted thousands of trees.',
+      'Carnivorous plants attract insects and trap them! The Venus flytrap is famous.',
+      'Plants are amazing. Nature is full of surprises!'
+    ],
+    rules:[
+      {title:'ow发音', desc:'ow通常发/aʊ/（如cow）或/əʊ/（如grow）'},
+      {title:'ee发音', desc:'ee组合通常发/iː/'},
+      {title:'-ure发音', desc:'-ure通常发/jʊər/或/ʃər/'}
+    ]
+  },
+  { id:'u7', name:'Unit 7', title:"Mind's Eye", sub:'心灵之眼', icon:'👁️', color:'purple',
+    words:[
+      {w:'dream',p:'/driːm/',m:'梦；做梦',pos:'n./v.',ex:'I had a strange dream last night.',rule:'dream发/driːm/ — ea发/iː/，dr发/dr/',parts:'dream',tips:'睡着时看到的画面'},
+      {w:'brain',p:'/breɪn/',m:'大脑',pos:'n.',ex:'The brain controls everything we do.',rule:'brain发/breɪn/ — ai发/eɪ/，br发/br/',parts:'brain',tips:'控制身体和思维的器官'},
+      {w:'sleep',p:'/sliːp/',m:'睡觉',pos:'v./n.',ex:'We need eight hours of sleep every night.',rule:'sleep发/sliːp/ — ee发/iː/，sl发/sl/',parts:'sleep',tips:'每天都要做的事情'},
+      {w:'imagine',p:'/ɪˈmædʒɪn/',m:'想象',pos:'v.',ex:'Can you imagine living on the moon?',rule:'im发/ɪ/，ag发/ˈmæ/，ine发/dʒɪn/',parts:'im-ag-ine',tips:'在脑子里画图画'},
+      {w:'illusion',p:'/ɪˈluːʒn/',m:'错觉',pos:'n.',ex:'The picture creates an optical illusion.',rule:'il发/ɪ/，lu发/ˈluː/，sion发/ʒn/',parts:'il-lu-sion',tips:'眼睛看到的不一定是真的'},
+      {w:'impossible',p:'/ɪmˈpɒsəbl/',m:'不可能的',pos:'adj.',ex:'Nothing is impossible if you try.',rule:'im发/ɪm/，po发/ˈpɒ/，ssi发/sə/，ble发/bl/',parts:'im-pos-si-ble',tips:'做不了的'},
+      {w:'memory',p:'/ˈmeməri/',m:'记忆',pos:'n.',ex:'She has a very good memory for names.',rule:'mem发/ˈmem/，o发/ə/，ry发/ri/',parts:'mem-o-ry',tips:'记住的东西'},
+      {w:'explain',p:'/ɪkˈspleɪn/',m:'解释',pos:'v.',ex:'The teacher will explain the answer.',rule:'ex发/ɪk/，plain发/ˈspleɪn/ — ai发/eɪ/',parts:'ex-plain',tips:'说清楚原因'},
+      {w:'active',p:'/ˈæktɪv/',m:'活跃的',pos:'adj.',ex:'The brain is very active when we dream.',rule:'ac发/ˈæk/，tive发/tɪv/',parts:'ac-tive',tips:'一直在动的'},
+      {w:'trick',p:'/trɪk/',m:'把戏；技巧',pos:'n.',ex:'The magician performed a clever trick.',rule:'trick发/trɪk/ — tr发/tr/，ck发/k/',parts:'trick',tips:'让人惊讶的方法'},
+      {w:'learn',p:'/lɜːrn/',m:'学习',pos:'v.',ex:'We learn new things every day.',rule:'learn发/lɜːrn/ — ear发/ɜː/，r发/r/',parts:'learn',tips:'学会新东西'},
+      {w:'store',p:'/stɔːr/',m:'储存',pos:'v.',ex:'The brain stores memories like a computer.',rule:'store发/stɔːr/ — st发/st/，ore发/ɔːr/',parts:'store',tips:'放进脑子里'}
+    ],
+    text:[
+      'The human brain is a powerful machine. It helps us dream, remember, and imagine amazing things.',
+      'Sometimes our eyes play tricks on us. This is called an optical illusion — our brain sees something that is not really there.',
+      'Scientists study how the brain works. They have discovered that sleep and memory are closely connected.'
+    ],
+    rules:[
+      {title:'ea组合', desc:'ea通常发/iː/（如dream）或/e/（如bread）或/ɜː/（如learn中的ear组合）'},
+      {title:'ai组合', desc:'ai通常发/eɪ/（如brain，explain）'},
+      {title:'-sion结尾', desc:'-sion通常发/ʒn/（如illusion）或/ʃn/（如mission）'}
+    ]
+  },
+  { id:'u8', name:'Unit 8', title:'Animal Wonders', sub:'动物奇观', icon:'🐧', color:'emerald',
+    words:[
+      {w:'penguin',p:'/ˈpeŋɡwɪn/',m:'企鹅',pos:'n.',ex:'Penguins live in very cold places.',rule:'pen发/ˈpeŋ/，guin发/ɡwɪn/',parts:'pen-guin',tips:'穿黑色礼服的小鸟'},
+      {w:'animal',p:'/ˈænɪml/',m:'动物',pos:'n.',ex:'There are many amazing animals in the world.',rule:'a发/ˈæ/，ni发/nɪ/，mal发/ml/',parts:'an-i-mal',tips:'有生命的生物'},
+      {w:'wonder',p:'/ˈwʌndər/',m:'惊奇；想知道',pos:'v./n.',ex:'I wonder how birds can fly so high.',rule:'won发/ˈwʌn/，der发/dər/',parts:'won-der',tips:'很想了解'},
+      {w:'communicate',p:'/kəˈmjuːnɪkeɪt/',m:'交流',pos:'v.',ex:'Dolphins communicate with sounds.',rule:'com发/kə/，mu发/ˈmjuː/，ni发/nɪ/，cate发/keɪt/',parts:'com-mu-ni-cate',tips:'互相传递信息'},
+      {w:'behavior',p:'/bɪˈheɪvjər/',m:'行为',pos:'n.',ex:'Scientists study animal behavior.',rule:'be发/bɪ/，hav发/ˈheɪ/，ior发/vjər/',parts:'be-hav-ior',tips:'动物做的事情'},
+      {w:'survive',p:'/sərˈvaɪv/',m:'生存',pos:'v.',ex:'Animals must find food to survive.',rule:'sur发/sər/，vive发/ˈvaɪv/ — i-e发/aɪ/',parts:'sur-vive',tips:'活下来'},
+      {w:'amazing',p:'/əˈmeɪzɪŋ/',m:'令人惊叹的',pos:'adj.',ex:"The penguin's journey is amazing.",rule:'a发/ə/，ma发/ˈmeɪ/，zing发/zɪŋ/',parts:'a-ma-zing',tips:'让人哇的一声'},
+      {w:'sound',p:'/saʊnd/',m:'声音',pos:'n.',ex:'Whales make beautiful sounds underwater.',rule:'sound发/saʊnd/ — ou发/aʊ/',parts:'sound',tips:'耳朵听到的'},
+      {w:'favorite',p:'/ˈfeɪvərɪt/',m:'最喜欢的',pos:'adj.',ex:'Penguins are my favorite animal.',rule:'fa发/ˈfeɪ/，vor发/vər/，ite发/ɪt/',parts:'fa-vor-ite',tips:'最爱的'},
+      {w:'play',p:'/pleɪ/',m:'玩；玩耍',pos:'v.',ex:'Young animals play to learn skills.',rule:'play发/pleɪ/ — ay发/eɪ/',parts:'play',tips:'做游戏'},
+      {w:'together',p:'/təˈɡeðər/',m:'一起',pos:'adv.',ex:'Many animals live together in groups.',rule:'to发/tə/，geth发/ˈɡe/，er发/ðər/',parts:'to-geth-er',tips:'不分开'},
+      {w:'group',p:'/ɡruːp/',m:'群体',pos:'n.',ex:'A group of penguins is called a colony.',rule:'group发/ɡruːp/ — ou发/uː/',parts:'group',tips:'很多动物在一起'}
+    ],
+    text:[
+      'Penguins are amazing animals. They live in large groups and work together to survive in cold environments.',
+      'Dolphins communicate with each other using sounds. Scientists study their behavior and have discovered that each dolphin has its own special call.',
+      'Young animals play together to learn important skills. Playing helps them survive when they grow up.'
+    ],
+    rules:[
+      {title:'-ing结尾', desc:'-ing发/ɪŋ/，如amazing，是进行时的标志'},
+      {title:'ou发音', desc:'ou可以发/aʊ/（如sound）或/uː/（如group）或/ʌ/（如young）'},
+      {title:'-ior结尾', desc:'-ior在behavior中发/jər/'}
+    ]
+  },
+  { id:'u9', name:'Unit 9', title:'Building Beauty', sub:'建筑之美', icon:'🏛️', color:'rose',
+    words:[
+      {w:'build',p:'/bɪld/',m:'建造',pos:'v.',ex:'They build a house with wood and stone.',rule:'build发/bɪld/ — ui发/ɪ/',parts:'build',tips:'做出一个建筑'},
+      {w:'beauty',p:'/ˈbjuːti/',m:'美；美丽',pos:'n.',ex:'Everyone admires the beauty of the building.',rule:'beau发/ˈbjuː/，ty发/ti/',parts:'beau-ty',tips:'让人喜欢看的样子'},
+      {w:'stone',p:'/stəʊn/',m:'石头',pos:'n.',ex:'Many old buildings are made of stone.',rule:'stone发/stəʊn/ — st发/st/，o-e发/əʊ/',parts:'stone',tips:'很硬的天然材料'},
+      {w:'dome',p:'/dəʊm/',m:'圆顶',pos:'n.',ex:'The dome is on top of the building.',rule:'dome发/dəʊm/ — o-e发/əʊ/',parts:'dome',tips:'像碗一样的圆顶'},
+      {w:'design',p:'/dɪˈzaɪn/',m:'设计',pos:'n./v.',ex:'The architect designed a beautiful building.',rule:'de发/dɪ/，sign发/ˈzaɪn/ — sign发/saɪn/',parts:'de-sign',tips:'画出来然后做'},
+      {w:'structure',p:'/ˈstrʌktʃər/',m:'结构',pos:'n.',ex:'The bridge has a strong structure.',rule:'struc发/ˈstrʌk/，ture发/tʃər/',parts:'struc-ture',tips:'建筑的样子和支撑'},
+      {w:'famous',p:'/ˈfeɪməs/',m:'著名的',pos:'adj.',ex:'The Taj Mahal is a famous building.',rule:'fa发/ˈfeɪ/，mous发/məs/',parts:'fa-mous',tips:'很多人都知道的'},
+      {w:'magnificent',p:'/mæɡˈnɪfɪsnt/',m:'壮丽的',pos:'adj.',ex:'The palace is magnificent.',rule:'mag发/mæɡ/，nif发/ˈnɪf/，i发/ɪ/，cent发/snt/',parts:'mag-nif-i-cent',tips:'非常漂亮和壮观'},
+      {w:'love',p:'/lʌv/',m:'爱；热爱',pos:'v./n.',ex:'People love visiting beautiful buildings.',rule:'love发/lʌv/ — o发/ʌ/（特殊）',parts:'love',tips:'非常喜欢'},
+      {w:'power',p:'/ˈpaʊər/',m:'力量；权力',pos:'n.',ex:'The columns have the power to hold up the roof.',rule:'pow发/ˈpaʊ/，er发/ər/',parts:'pow-er',tips:'支撑的力量'},
+      {w:'story',p:'/ˈstɔːri/',m:'故事；楼层',pos:'n.',ex:'Every building tells a story.',rule:'sto发/ˈstɔː/，ry发/ri/',parts:'sto-ry',tips:'建筑也有故事'},
+      {w:'world',p:'/wɜːrld/',m:'世界',pos:'n.',ex:'There are beautiful buildings all over the world.',rule:'world发/wɜːrld/ — or发/ɜːr/（特殊）',parts:'world',tips:'整个地球'}
+    ],
+    text:[
+      'Some buildings are famous for their beauty. The Taj Mahal in India is made of white stone and has a magnificent dome.',
+      'Architects design buildings that are both beautiful and strong. The structure must be safe and stand for many years.',
+      'People travel from all over the world to see these amazing buildings. Each one tells a story of the culture that built it.'
+    ],
+    rules:[
+      {title:'ui组合', desc:'ui通常发/uː/（如fruit），但在build中发/ɪ/（特殊）'},
+      {title:'eau组合', desc:'eau在beauty中发/juː/'},
+      {title:'o-e结构', desc:'o-e是魔法e结构，o发长音/əʊ/（如stone，dome）'}
+    ]
+  },
+  { id:'u10', name:'Unit 10', title:'Forces of Nature', sub:'自然之力', icon:'🌊', color:'orange',
+    words:[
+      {w:'force',p:'/fɔːrs/',m:'力量',pos:'n.',ex:'The force of the wind knocked down trees.',rule:'force发/fɔːrs/ — or发/ɔːr/，ce发/s/',parts:'force',tips:'推或拉的力量'},
+      {w:'weather',p:'/ˈweðər/',m:'天气',pos:'n.',ex:'The weather can change very quickly.',rule:'wea发/ˈwe/，ther发/ðər/',parts:'wea-ther',tips:'每天天空的状况'},
+      {w:'storm',p:'/stɔːrm/',m:'暴风雨',pos:'n.',ex:'A big storm is coming from the ocean.',rule:'storm发/stɔːrm/ — or发/ɔːr/',parts:'storm',tips:'大风大雨的天气'},
+      {w:'tornado',p:'/tɔːrˈneɪdəʊ/',m:'龙卷风',pos:'n.',ex:'The tornado destroyed several houses.',rule:'tor发/tɔːr/，na发/ˈneɪ/，do发/dəʊ/',parts:'tor-na-do',tips:'旋转的风柱'},
+      {w:'strike',p:'/straɪk/',m:'袭击；打击',pos:'v./n.',ex:'Lightning struck the tree during the storm.',rule:'strike发/straɪk/ — i-e发/aɪ/，str发/str/',parts:'strike',tips:'突然攻击'},
+      {w:'damage',p:'/ˈdæmɪdʒ/',m:'损坏',pos:'n./v.',ex:'The storm caused a lot of damage.',rule:'dam发/ˈdæm/，age发/ɪdʒ/',parts:'dam-age',tips:'被弄坏了'},
+      {w:'dangerous',p:'/ˈdeɪndʒərəs/',m:'危险的',pos:'adj.',ex:'Tornadoes are very dangerous.',rule:'dan发/ˈdeɪn/，ger发/dʒər/，ous发/əs/',parts:'dan-ger-ous',tips:'可能伤害人的'},
+      {w:'protect',p:'/prəˈtekt/',m:'保护',pos:'v.',ex:'We protect ourselves from the storm.',rule:'pro发/prə/，tect发/ˈtekt/',parts:'pro-tect',tips:'不让受伤'},
+      {w:'powerful',p:'/ˈpaʊərfl/',m:'强大的',pos:'adj.',ex:'The tornado is a powerful force of nature.',rule:'pow发/ˈpaʊ/，er发/ər/，ful发/fl/',parts:'pow-er-ful',tips:'力量很大的'},
+      {w:'warning',p:'/ˈwɔːrnɪŋ/',m:'警报；警告',pos:'n.',ex:'The weather service issued a storm warning.',rule:'warn发/ˈwɔːrn/，ing发/ɪŋ/',parts:'warn-ing',tips:'提前告诉你的'},
+      {w:'start',p:'/stɑːrt/',m:'开始',pos:'v.',ex:'The storm started suddenly.',rule:'start发/stɑːrt/ — ar发/ɑːr/，st发/st/',parts:'start',tips:'从没有到有'},
+      {w:'keep',p:'/kiːp/',m:'保持',pos:'v.',ex:'Stay inside to keep safe during a storm.',rule:'keep发/kiːp/ — ee发/iː/',parts:'keep',tips:'一直维持'}
+    ],
+    text:[
+      'Nature has powerful forces. Tornadoes are one of the most dangerous — they can destroy houses and lift cars into the air.',
+      'Weather scientists use satellites and computers to predict storms. They issue warnings so people can stay safe.',
+      'To protect yourself during a storm, stay inside and keep away from windows. The storm may cause damage, but being prepared can save lives.'
+    ],
+    rules:[
+      {title:'or组合', desc:'or通常发/ɔːr/（如force，storm，tornado）'},
+      {title:'-ful后缀', desc:'-ful是形容词后缀，表示"充满...的/有...力量的"，如powerful'},
+      {title:'-ous后缀', desc:'-ous是形容词后缀，表示"有...特性的"，如dangerous'}
+    ]
+  },
+  { id:'u11', name:'Unit 11', title:'Giants of the Past', sub:'远古巨兽', icon:'🦕', color:'amber',
+    words:[
+      {w:'giant',p:'/ˈdʒaɪənt/',m:'巨大的；巨人',pos:'adj./n.',ex:'The giant dinosaur was taller than a house.',rule:'gi发/ˈdʒaɪ/，ant发/ənt/',parts:'gi-ant',tips:'非常大的'},
+      {w:'mammoth',p:'/ˈmæməθ/',m:'猛犸象',pos:'n.',ex:'Mammoths lived during the Ice Age.',rule:'mam发/ˈmæm/，moth发/əθ/',parts:'mam-moth',tips:'长毛的大象'},
+      {w:'extinct',p:'/ɪkˈstɪŋkt/',m:'灭绝的',pos:'adj.',ex:'Dinosaurs became extinct long ago.',rule:'ex发/ɪk/，tinct发/ˈstɪŋkt/',parts:'ex-tinct',tips:'地球上没有了'},
+      {w:'fossil',p:'/ˈfɒsl/',m:'化石',pos:'n.',ex:'Scientists discovered dinosaur fossils.',rule:'fos发/ˈfɒs/，sil发/sl/',parts:'fos-sil',tips:'藏在石头里的骨头'},
+      {w:'creature',p:'/ˈkriːtʃər/',m:'生物',pos:'n.',ex:'Giant creatures once lived on Earth.',rule:'crea发/ˈkriː/，ture发/tʃər/',parts:'crea-ture',tips:'活着的生物'},
+      {w:'enormous',p:'/ɪˈnɔːrməs/',m:'庞大的',pos:'adj.',ex:'Some dinosaurs were enormous.',rule:'e发/ɪ/，nor发/ˈnɔːr/，mous发/məs/',parts:'e-nor-mous',tips:'大得惊人'},
+      {w:'bone',p:'/bəʊn/',m:'骨头',pos:'n.',ex:'The museum has dinosaur bones on display.',rule:'bone发/bəʊn/ — o-e发/əʊ/',parts:'bone',tips:'身体里硬硬的东西'},
+      {w:'prehistoric',p:'/ˌpriːhɪˈstɒrɪk/',m:'史前的',pos:'adj.',ex:'Prehistoric animals lived millions of years ago.',rule:'pre发/ˈpriː/，his发/hɪ/，tor发/ˈstɒr/，ic发/ɪk/',parts:'pre-his-tor-ic',tips:'有文字之前'},
+      {w:'ice',p:'/aɪs/',m:'冰',pos:'n.',ex:'The Ice Age was a very cold time.',rule:'ice发/aɪs/ — i-e发/aɪ/，ce发/s/',parts:'ice',tips:'水结成的硬块'},
+      {w:'age',p:'/eɪdʒ/',m:'时代；年龄',pos:'n.',ex:'The Ice Age was a time of extreme cold.',rule:'age发/eɪdʒ/ — a-e发/eɪ/，ge发/dʒ/',parts:'age',tips:'很长的一段时间'},
+      {w:'sea',p:'/siː/',m:'大海',pos:'n.',ex:'Prehistoric creatures lived in the sea too.',rule:'sea发/siː/ — ea发/iː/',parts:'sea',tips:'很大很大的一片水'},
+      {w:'dolphin',p:'/ˈdɒlfɪn/',m:'海豚',pos:'n.',ex:'Ancient dolphins lived in the sea.',rule:'dol发/ˈdɒl/，phin发/fɪn/',parts:'dol-phin',tips:'聪明的海洋动物'}
+    ],
+    text:[
+      'Long ago, giant creatures lived on Earth. Mammoths, dinosaurs, and enormous sea creatures roamed the land and oceans.',
+      'Scientists study fossils to learn about prehistoric life. Bones and teeth tell us what these animals ate and how they lived.',
+      'The Ice Age was a cold time when huge sheets of ice covered much of the Earth. Many animals, like the mammoth, survived this cold period.'
+    ],
+    rules:[
+      {title:'gi发音', desc:'gi通常发/dʒ/（如giant，giraffe）或/ɡ/（如give，get）'},
+      {title:'o-e结构', desc:'o-e魔法e使o发长音/əʊ/（如bone）'},
+      {title:'pre-前缀', desc:'pre-前缀表示"在...之前"，如prehistoric（史前的），preview（预览）'}
+    ]
+  },
+  { id:'u12', name:'Unit 12', title:'Technology', sub:'科技', icon:'🤖', color:'blue',
+    words:[
+      {w:'robot',p:'/ˈrəʊbɒt/',m:'机器人',pos:'n.',ex:'The robot can help with housework.',rule:'ro发/ˈrəʊ/，bot发/bɒt/',parts:'ro-bot',tips:'会自己动的机器'},
+      {w:'technology',p:'/tekˈnɒlədʒi/',m:'技术；科技',pos:'n.',ex:'Technology makes our lives easier.',rule:'tech发/tek/，nol发/ˈnɒ/，o发/lə/，gy发/dʒi/',parts:'tech-nol-o-gy',tips:'让生活更好的发明'},
+      {w:'future',p:'/ˈfjuːtʃər/',m:'未来',pos:'n.',ex:'What will technology be like in the future?',rule:'fu发/ˈfjuː/，ture发/tʃər/',parts:'fu-ture',tips:'以后的时间'},
+      {w:'machine',p:'/məˈʃiːn/',m:'机器',pos:'n.',ex:'This machine can do many jobs.',rule:'ma发/mə/，chine发/ˈʃiːn/ — ch发/ʃ/',parts:'ma-chine',tips:'代替人工作的东西'},
+      {w:'smart',p:'/smɑːrt/',m:'智能的；聪明的',pos:'adj.',ex:'Smartphones are a great invention.',rule:'smart发/smɑːrt/ — ar发/ɑːr/，sm发/sm/',parts:'smart',tips:'很聪明的'},
+      {w:'invent',p:'/ɪnˈvent/',m:'发明',pos:'v.',ex:'Thomas Edison invented the light bulb.',rule:'in发/ɪn/，vent发/ˈvent/',parts:'in-vent',tips:'第一次做出来'},
+      {w:'device',p:'/dɪˈvaɪs/',m:'设备；装置',pos:'n.',ex:'A smartphone is a useful device.',rule:'de发/dɪ/，vice发/ˈvaɪs/ — i-e发/aɪ/，ce发/s/',parts:'de-vice',tips:'有专门用途的工具'},
+      {w:'change',p:'/tʃeɪndʒ/',m:'改变；变化',pos:'v./n.',ex:'Technology has changed the world.',rule:'change发/tʃeɪndʒ/ — ch发/tʃ/，a发/eɪ/，nge发/ndʒ/',parts:'change',tips:'变得不一样'},
+      {w:'exciting',p:'/ɪkˈsaɪtɪŋ/',m:'令人兴奋的',pos:'adj.',ex:'New technology is very exciting.',rule:'ex发/ɪk/，ci发/ˈsaɪ/，ting发/tɪŋ/',parts:'ex-ci-ting',tips:'让人心跳加速的'},
+      {w:'life',p:'/laɪf/',m:'生活；生命',pos:'n.',ex:'Technology improves our daily life.',rule:'life发/laɪf/ — i-e发/aɪ/，l发/l/，f发/f/',parts:'life',tips:'我们的日常'},
+      {w:'way',p:'/weɪ/',m:'方式；方法',pos:'n.',ex:'There are many ways to use technology.',rule:'way发/weɪ/ — ay发/eɪ/，w发/w/',parts:'way',tips:'做事情的方法'},
+      {w:'friend',p:'/frend/',m:'朋友',pos:'n.',ex:'Technology helps us stay in touch with friends.',rule:'friend发/frend/ — ie发/e/（特殊）',parts:'friend',tips:'你认识并喜欢的人'}
+    ],
+    text:[
+      'Technology has changed our lives in amazing ways. Robots can clean our homes, and smartphones connect us with friends around the world.',
+      'In the future, technology will become even more exciting. Scientists are inventing smart machines that can help with all kinds of jobs.',
+      'Life is easier because of technology, but it also keeps changing. The devices we use today may look very different in the future.'
+    ],
+    rules:[
+      {title:'ch发音', desc:'ch在technology/machine中发/ʃ/（特殊），在change中发/tʃ/（常规）'},
+      {title:'-ogy结尾', desc:'-ogy发/ɒlədʒi/，表示"...学/...技术"'},
+      {title:'-ure结尾', desc:'-ure在future中发/tʃər/（=ture），如future, picture'}
+    ]
+  }
+];
+
+// ============================================================
+// PHONICS COLOR DETECTION & SYLLABLE SPEAKING
+// ============================================================
+function getSyllableClass(syl) {
+  const s = syl.toLowerCase().replace(/[ˈˌ]/g, '');
+  const vowelTeam = /(?:ai|ay|ee|ea|oa|oe|ue|ui|ie|ei|oo|au|aw|oi|oy|ou|ow)/;
+  const specialEnding = /(?:tion|sion|ture|cious|tial|cial|gion|ssion|cian|tient|tience)$/;
+  const rControlled = /[aeiou]+r$/i;
+
+  // Special endings first
+  if (specialEnding.test(s) || (/le$/.test(s) && s.length > 2)) return 'syl-special';
+  if (/(?:ful|ness|less|ment|ive|ous|ing)$/.test(s) && s.length > 2) return 'syl-special';
+
+  // R-controlled
+  if (rControlled.test(s)) return 'syl-r-control';
+  if (/[aeiou]r[^aeiou]*$/.test(s) && !/[aeiou][aeiou]/.test(s)) return 'syl-r-control';
+
+  // Vowel team
+  if (vowelTeam.test(s) && /[aeiou][aeiou]/.test(s)) return 'syl-vowel-team';
+
+  // Magic e
+  if (/[aeiou][a-z]e$/.test(s) && !/[aeiou][aeiou][a-z]e$/.test(s)) {
+    const m = s.match(/^.*?[aeiou]+([a-z]+)e$/);
+    if (m && m[1].length >= 1 && s.length > 2) return 'syl-magic-e';
+  }
+
+  // Open syllable
+  if (/[aeiou]$/.test(s) && s.length > 0) return 'syl-open';
+
+  // Closed syllable (default)
+  return 'syl-closed';
+}
+
+function speakSyllable(sylText) {
+  if (!sylText) return;
+  // Use child voice with emphasis on just this syllable
+  const voiceMode = load('childVoice', true);
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(sylText.toLowerCase());
+    u.lang = 'en-US';
+    u.rate = voiceMode ? 0.7 : 0.85;
+    u.pitch = voiceMode ? 1.35 : 1.0;
+    // Find a suitable voice
+    const voices = window.speechSynthesis.getVoices();
+    const childLike = voices.find(v => /google/i.test(v.name) && /english/i.test(v.lang))
+      || voices.find(v => /microsoft/i.test(v.name) && /english/i.test(v.lang) && /david/i.test(v.name));
+    if (childLike && voiceMode) u.voice = childLike;
+    window.speechSynthesis.speak(u);
+  }
+}
+
+function colorSyllables(partsStr) {
+  if (!partsStr) return '';
+  const syls = partsStr.split('-');
+  return syls.map(s => {
+    const cls = getSyllableClass(s);
+    const escaped = s.replace(/'/g, "\\'");
+    return `<span class="${cls} font-bold cursor-pointer hover:underline hover:opacity-80 transition" onclick="event.stopPropagation();speakSyllable('${escaped}')" title="点击听音节发音">${s}</span>`;
+  }).join('<span class="text-gray-300 dark:text-gray-600 mx-0.5">-</span>');
+}
+
+function colorSyllablesInline(partsStr) {
+  if (!partsStr) return '';
+  const syls = partsStr.split('-');
+  return syls.map(s => {
+    const cls = getSyllableClass(s);
+    const escaped = s.replace(/'/g, "\\'");
+    return `<span class="${cls} cursor-pointer hover:underline hover:opacity-80 transition" onclick="event.stopPropagation();speakSyllable('${escaped}')" title="点击听音节发音">${s}</span>`;
+  }).join('<span class="text-gray-300 dark:text-gray-600">-</span>');
+}
+
+// Legend for phonics colors
+const phonicsLegend = [
+  {cls:'syl-closed', label:'闭音节', eg:'cat, bed, sit'},
+  {cls:'syl-open', label:'开音节', eg:'go, me, hi'},
+  {cls:'syl-magic-e', label:'魔法e', eg:'make, time'},
+  {cls:'syl-r-control', label:'r控制', eg:'car, for, her'},
+  {cls:'syl-vowel-team', label:'元音组合', eg:'read, boat'},
+  {cls:'syl-special', label:'特殊结尾', eg:'-tion, -ture, -le'}
+];
+
+// Unit theme gradient colors
+const themeGradients = {
+  purple:  'from-purple-500 to-purple-700',
+  red:     'from-red-500 to-rose-600',
+  blue:    'from-blue-500 to-indigo-600',
+  cyan:    'from-cyan-500 to-teal-600',
+  green:   'from-green-500 to-emerald-600',
+  emerald:'from-emerald-500 to-green-600',
+  sky:     'from-sky-500 to-blue-600',
+  indigo:  'from-indigo-500 to-purple-600',
+  rose:    'from-rose-500 to-pink-600',
+  orange:  'from-orange-500 to-red-500',
+  amber:   'from-amber-500 to-orange-600',
+  pink:    'from-pink-500 to-rose-600',
+};
+const defaultGrad = 'from-green-500 to-emerald-600';
+function unitGrad(u) { return u && themeGradients[u.color] ? themeGradients[u.color] : defaultGrad; }
+
+// Word emoji map — gives each word a fun visual hint
+const wordEmojis = {
+  // Unit 1
+  mystery:'🔮', visitor:'🚪', appear:'💫', disappear:'🫥', ancient:'🏛️', legend:'📜', explore:'🔍', discover:'💡',
+  // Unit 2
+  competition:'🏆', record:'📊', spicy:'🌶️', taste:'👅', challenge:'🎯', delicious:'😋', painful:'😖', flavor:'🍋',
+  // Unit 3
+  archaeologist:'🦴', dig:'⛏️', camera:'📷', photograph:'🖼️', career:'💼', adventure:'🗺️', professional:'👔', skill:'🎯',
+  patience:'🧘', wildlife:'🦁', ground:'🌍', past:'⏳',
+  // Unit 4
+  ship:'🚢', sink:'⬇️', ocean:'🌊', deep:'🏊', wreck:'💔', dive:'🤿', treasure:'💎', rest:'😴',
+  famous:'🌟', bottom:'⬇️', kilometer:'📏',
+  // Unit 5
+  disease:'🤒', detective:'🔎', crime:'🚨', evidence:'🔬', investigate:'🧐', solve:'✅', clue:'🔑', examine:'🔍',
+  special:'⭐', scene:'📍', truth:'💯', careful:'⚠️',
+  // Unit 6
+  plant:'🌱', grow:'📈', seed:'🌰', forest:'🌲', attract:'🦋', insect:'🐛', trap:'🪤', nature:'🌿',
+  // Unit 7
+  dream:'💭', brain:'🧠', sleep:'😴', imagine:'🌈', illusion:'🎭', impossible:'🚫', memory:'📝', explain:'💬',
+  active:'⚡', trick:'🎩', learn:'📚', store:'💾',
+  // Unit 8
+  penguin:'🐧', animal:'🐾', wonder:'🤔', communicate:'💬', behavior:'👀', amazing:'🌟', sound:'🔊',
+  favorite:'❤️', play:'🎮', together:'👫', group:'👥',
+  // Unit 9
+  build:'🏗️', beauty:'🌸', stone:'🪨', dome:'🏛️', design:'📐', structure:'🏗️', magnificent:'👑',
+  love:'💕', power:'💪', story:'📖', world:'🌍',
+  // Unit 10
+  force:'💥', weather:'🌤️', storm:'⛈️', tornado:'🌪️', strike:'⚡', damage:'💥', dangerous:'⚠️',
+  protect:'🛡️', powerful:'💪', warning:'🚨', start:'🎬', keep:'🔄',
+  // Unit 11
+  giant:'🦕', mammoth:'🦣', extinct:'💀', fossil:'🦴', creature:'🐾', enormous:'🐋', bone:'🦴',
+  prehistoric:'🦕', ice:'🧊', age:'📅', sea:'🌊', dolphin:'🐬',
+  // Unit 12
+  robot:'🤖', technology:'💻', future:'🚀', machine:'⚙️', smart:'🧠', invent:'💡', device:'📱',
+  change:'🔄', exciting:'🎉', life:'🌅', way:'🛤️', friend:'🤝',
+};
+function getWordEmoji(w) { return wordEmojis[w.toLowerCase()] || '📖'; }
+
+// Word form generator — returns plural, past, -ing, 3rd person, comparative etc.
+const irregularVerbs = {
+  dig:'dug/digs/digging', sink:'sank/sinks/sinking', swim:'swam/swims/swimming',
+  strike:'struck/strikes/striking', win:'won/wins/winning', lose:'lost/loses/losing',
+  build:'built/builds/building', sleep:'slept/sleeps/sleeping', dream:'dreamt/dreams/dreaming',
+  teach:'taught/teaches/teaching', catch:'caught/catches/catching', keep:'kept/keeps/keeping',
+  learn:'learnt/learns/learning', feel:'felt/feels/feeling', leave:'left/leaves/leaving',
+  mean:'meant/means/meaning', meet:'met/meets/meeting', read:'read/reads/reading',
+  run:'ran/runs/running', say:'said/says/saying', see:'saw/sees/seeing',
+  send:'sent/sends/sending', set:'set/sets/setting', show:'showed/shows/showing',
+  sit:'sat/sits/sitting', speak:'spoke/speaks/speaking', stand:'stood/stands/standing',
+  take:'took/takes/taking', tell:'told/tells/telling', think:'thought/thinks/thinking',
+  write:'wrote/writes/writing', begin:'began/begins/beginning', bring:'brought/brings/bringing',
+  buy:'bought/buys/buying', come:'came/comes/coming', do:'did/does/doing',
+  drink:'drank/drinks/drinking', drive:'drove/drives/driving', eat:'ate/eats/eating',
+  fall:'fell/falls/falling', find:'found/finds/finding', fly:'flew/flies/flying',
+  forget:'forgot/forgets/forgetting', get:'got/gets/getting', give:'gave/gives/giving',
+  go:'went/goes/going', grow:'grew/grows/growing', have:'had/has/having',
+  hear:'heard/hears/hearing', hide:'hid/hides/hiding', hold:'held/holds/holding',
+  know:'knew/knows/knowing', make:'made/makes/making', put:'put/puts/putting',
+  spend:'spent/spends/spending', understand:'understood/understands/understanding',
+};
+const irregularNouns = {
+  child:'children', foot:'feet', tooth:'teeth', man:'men', woman:'women',
+  mouse:'mice', person:'people', leaf:'leaves', life:'lives', shelf:'shelves',
+  wolf:'wolves', knife:'knives', half:'halves', thief:'thieves',
+  phenomenon:'phenomena', species:'species', deer:'deer', fish:'fish',
+};
+
+function pluralForm(word) {
+  const irr = irregularNouns[word.toLowerCase()];
+  if (irr) return irr;
+  if (/[sxz]$|[sc]h$|sh$/.test(word)) return word + 'es';
+  if (/[^aeiou]y$/.test(word)) return word.slice(0, -1) + 'ies';
+  if (/[^aeiou]o$/.test(word)) return word + 'es';
+  if (/fe?$/.test(word)) return word.replace(/fe?$/, 'ves');
+  return word + 's';
+}
+function pastForm(word) {
+  const irr = irregularVerbs[word.toLowerCase()];
+  if (irr) return irr.split('/')[0];
+  if (/e$/.test(word)) return word + 'd';
+  if (/[^aeiou][aeiou][^aeiouhwxy]$/.test(word) && word.length === 3) return word + word.slice(-1) + 'ed';
+  if (/[^aeiou]y$/.test(word)) return word.slice(0, -1) + 'ied';
+  return word + 'ed';
+}
+function ingForm(word) {
+  const irr = irregularVerbs[word.toLowerCase()];
+  if (irr) return irr.split('/')[2] || word + 'ing';
+  if (/e$/.test(word) && !/ee$/.test(word)) return word.replace(/e$/, 'ing');
+  if (/[^aeiou][aeiou][^aeiouhwxy]$/.test(word) && word.length === 3) return word + word.slice(-1) + 'ing';
+  return word + 'ing';
+}
+function thirdForm(word) {
+  const irr = irregularVerbs[word.toLowerCase()];
+  if (irr) return irr.split('/')[1] || word + 's';
+  if (/[sxz]$|[sc]h$|sh$|o$/.test(word)) return word + 'es';
+  if (/[^aeiou]y$/.test(word)) return word.slice(0, -1) + 'ies';
+  return word + 's';
+}
+function compForm(word) {
+  if (word.length <= 5 && !/more|most/.test(word)) {
+    if (/e$/.test(word)) return word + 'r / ' + word + 'st';
+    if (/[^aeiou]y$/.test(word)) return word.slice(0,-1)+'ier / '+word.slice(0,-1)+'iest';
+    if (/[^aeiou][aeiou][^aeiou]$/.test(word)) return word+word.slice(-1)+'er / '+word+word.slice(-1)+'est';
+    return word + 'er / ' + word + 'est';
+  }
+  return 'more ' + word + ' / most ' + word;
+}
+function getWordForms(w) {
+  const word = w.w;
+  const pos = w.pos;
+  const forms = [];
+  if (/n\./.test(pos) || /noun/i.test(pos)) {
+    const p = pluralForm(word);
+    if (p !== word) forms.push(`复数 ${p}`);
+  }
+  if (/v\./.test(pos) || /verb/i.test(pos)) {
+    forms.push(`过去式 ${pastForm(word)}`);
+    forms.push(`现在分词 ${ingForm(word)}`);
+    const t = thirdForm(word);
+    if (t !== word + 's' || !forms.some(f=>f.includes(t))) forms.push(`第三人称 ${t}`);
+  }
+  if (/adj/.test(pos) || /adjective/i.test(pos)) {
+    const c = compForm(word);
+    forms.push(`比较 ${c}`);
+  }
+  if (/adv/.test(pos) || /adverb/i.test(pos)) {
+    forms.push(`比较级 more ${word} / most ${word}`);
+  }
+  // General: show plural if noun-like
+  if (forms.length === 0 && /n/.test(pos)) {
+    const p = pluralForm(word);
+    if (p !== word) forms.push(`复数 ${p}`);
+  }
+  if (forms.length === 0) {
+    forms.push(`原形 ${word}`);
+  }
+  return forms.join(' · ');
+}
+
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+function speak(text, rate=0.85) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    const voiceMode = load('childVoice', true);
+    if (voiceMode) {
+      u.rate = 0.7;
+      u.pitch = 1.3;
+      const voices = window.speechSynthesis.getVoices();
+      const childLike = voices.find(v => /google/i.test(v.name) && /english/i.test(v.lang))
+        || voices.find(v => /microsoft/i.test(v.name) && /english/i.test(v.lang) && /david/i.test(v.name));
+      if (childLike) u.voice = childLike;
+    } else {
+      u.rate = rate;
+      u.pitch = 1.0;
+    }
+    window.speechSynthesis.speak(u);
+    return u;
+  }
+}
+// Fisher-Yates shuffle — unbiased
+function shuffle(a) {
+  const arr = [...a];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+function save(k,v) { localStorage.setItem(k, JSON.stringify(v)); }
+function load(k,def) { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } }
+
+const cheers = ['太棒了！','干得漂亮！','继续加油！','你真厉害！'];
+const oops = ['再试一次！','别灰心！','加油，你可以的！'];
+
+// ============================================================
+// APP CLASS
+// ============================================================
+class App {
+  constructor() {
+    // Dark mode
+    this.dark = load('dark', window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', this.dark);
+
+    this.page = 'home';
+    this.unitId = null;
+    this.learnIdx = 0;
+    this.reader = { idx:0, playing:false, rate:0.85 };
+    this.flash = { idx:0, flipped:false };
+    this.game = {
+      mode:'', hearts:5, xp:0, combo:0, maxCombo:0,
+      total:10, correct:0, qIdx:0, questions:[], curr:null,
+      selected:null, result:null, finished:false, wrongWords:[]
+    };
+    this.search = { query:'', results:[], selectedWord:null };
+    this.toast = null;
+    this.legendVisible = false;
+    this.childVoice = load('childVoice', true);
+    this.recording = undefined;
+    this.setupKeyboard();
+    this.render();
+  }
+
+  // --- Child Voice ---
+  toggleVoice() {
+    this.childVoice = !this.childVoice;
+    save('childVoice', this.childVoice);
+    this.showToast(this.childVoice ? '🔊 儿童发音模式' : '🔊 标准发音模式', 'info');
+    this.render();
+  }
+
+  // --- Dark Mode ---
+  toggleDark() {
+    this.dark = !this.dark;
+    document.documentElement.classList.toggle('dark', this.dark);
+    save('dark', this.dark);
+  }
+
+  // --- Toast ---
+  showToast(msg, type='info') {
+    if (this.toast) clearTimeout(this.toast.timer);
+    this.toast = { msg, type };
+    this.render();
+    this.toast.timer = setTimeout(() => {
+      this.toast = null;
+      this.render();
+    }, 2500);
+  }
+
+  // --- Keyboard ---
+  setupKeyboard() {
+    document.addEventListener('keydown', (e) => {
+      if (this.page === 'learn') {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); this.prevWord(); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); this.nextWord(); }
+        if (e.key === ' ' && e.target.tagName !== 'INPUT') { e.preventDefault();
+          const w = this.getWords()[this.learnIdx]; if (w) speak(w.w); }
+      }
+      if (this.page === 'flash') {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); this.prevFlash(); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); this.nextFlash(); }
+        if (e.key === ' ') { e.preventDefault(); this.flipFlash(); }
+        if (e.key === 'Enter') { e.preventDefault(); this.flipFlash(); }
+      }
+      if (this.page === 'read') {
+        if (e.key === ' ') { e.preventDefault(); this.toggleRead(); }
+      }
+      if (this.page === 'game') {
+        if (e.key === 'Enter' && this.game.result !== null) { this.nextQuestion(); }
+      }
+    });
+  }
+
+  // --- Navigation ---
+  render() { document.getElementById('app').innerHTML = this.html(); }
+
+  html() {
+    switch(this.page) {
+      case 'home': return this.homeHTML();
+      case 'unitSelect': return this.unitSelectHTML();
+      case 'learn': return this.learnHTML();
+      case 'read': return this.readHTML();
+      case 'flash': return this.flashHTML();
+      case 'game': return this.gameHTML();
+      case 'search': return this.searchHTML();
+      default: return this.homeHTML();
+    }
+  }
+
+  getWords() {
+    if (!this.unitId) return units.flatMap(u=>u.words);
+    return (units.find(u=>u.id===this.unitId)||{words:[]}).words;
+  }
+  getUnit() { return units.find(u=>u.id===this.unitId); }
+
+  // ============================================================
+  // HOME PAGE
+  // ============================================================
+  homeHTML() {
+    const xp = load('xp', 0);
+    const streak = load('streak', 0);
+    const progress = load('wp', {});
+    let learned = 0;
+    const totalWords = units.reduce((s,u)=>s+u.words.length, 0);
+    units.forEach(u=>u.words.forEach(w=>{ if(progress[w.w]?.learned) learned++; }));
+
+    // Get wrong words for review
+    const wrongWords = Object.entries(progress)
+      .filter(([k,v]) => v.w > v.c && v.w >= 2)
+      .map(([k]) => k);
+
+    return `
+    <header class="bg-gradient-to-r from-green-500 via-emerald-500 to-teal-600 text-white px-4 py-3 sticky top-0 z-10 shadow-lg">
+      <div class="max-w-lg mx-auto flex items-center justify-between">
+        <h1 class="text-lg font-bold">📖 单词冒险 <span class="text-xs opacity-70 font-normal">Reading Explorer</span></h1>
+        <div class="flex items-center gap-2 text-sm">
+          <button onclick="app.toggleDark()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="深色模式">${this.dark?'☀️':'🌙'}</button>
+          <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="切换发音模式">${this.childVoice?'👶':'🔊'}</button>
+          <span class="bg-white/20 px-2 py-1 rounded-full text-xs">📚 ${units.length}单元</span>
+          <span class="bg-white/20 px-2 py-1 rounded-full text-xs">🔥 ${streak}天</span>
+          <span class="bg-white/20 px-2 py-1 rounded-full">⭐ ${xp} XP</span>
+        </div>
+      </div>
+    </header>
+    <main class="max-w-lg mx-auto px-4 py-6">
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 mb-6 text-center relative">
+        <div class="unit-emoji-bg">📖</div>
+        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">Reading Explorer Foundations</h2>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">第三版 · 12单元完整学习 · 132个单词</p>
+        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-2">
+          <div class="h-3 rounded-full bg-gradient-to-r from-green-400 to-emerald-500 progress-bar" style="width:${learned/totalWords*100}%"></div>
+        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400">已掌握 ${learned} / ${totalWords} 个单词</p>
+        ${wrongWords.length > 0 ? `
+        <button onclick="app.goReview()" class="mt-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-4 py-2 rounded-xl text-sm btn-press border border-red-200 dark:border-red-800">
+          🔄 复习易错词 (${wrongWords}个)
+        </button>` : ''}
+      </div>
+
+      <h3 class="font-bold text-gray-700 dark:text-gray-300 mb-3">🎮 选择学习模式</h3>
+      <div class="grid grid-cols-2 gap-3 mb-6">
+        ${this.modeBtn('learn','📚','单词学习','自然拼读+发音+解析','blue')}
+        ${this.modeBtn('read','📖','课文朗读','智能朗读+逐句高亮','indigo')}
+        ${this.modeBtn('flash','🃏','单词闪卡','翻转记忆+发音','pink')}
+        ${this.modeBtn('game','🎮','练习挑战','多邻国风格闯关','green')}
+      </div>
+
+      <h3 class="font-bold text-gray-700 dark:text-gray-300 mb-3">📂 全部单元</h3>
+      <div class="space-y-2">
+        ${units.map(u=>{
+          const l = u.words.filter(w=>progress[w.w]?.learned).length;
+          const pct = l/u.words.length*100;
+          return `<button onclick="app.goLearn('${u.id}')" class="card-hover w-full bg-white dark:bg-gray-800 rounded-xl shadow p-3 flex items-center gap-3 text-left border-l-4 border-${u.color}-400">
+            <div class="text-3xl">${u.icon}</div>
+            <div class="flex-1">
+              <div class="font-bold text-gray-800 dark:text-gray-100">${u.name}: ${u.title}</div>
+              <div class="text-xs text-gray-400 dark:text-gray-500">${u.sub}</div>
+              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-1">
+                <div class="h-1.5 rounded-full bg-green-400" style="width:${pct}%"></div>
+              </div>
+            </div>
+            <span class="text-xs text-gray-400 dark:text-gray-500">${l}/${u.words.length}</span>
+          </button>`;
+        }).join('')}
+      </div>
+
+      <div class="mt-6 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-lg">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="flex-1 relative">
+            <input type="text" id="searchInput" placeholder="🔍 搜索单词、中文意思或例句..." 
+              class="w-full px-4 py-3 pl-10 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 dark:text-gray-200"
+              onkeydown="if(event.key==='Enter')app.doSearch()">
+          </div>
+          <button onclick="app.doSearch()" class="bg-green-500 text-white px-4 py-3 rounded-xl font-bold btn-press">搜索</button>
+        </div>
+
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-bold text-gray-700 dark:text-gray-300 text-sm">🎨 自然拼读颜色图例</h3>
+          <button onclick="app.toggleLegend()" class="text-xs text-blue-500 btn-press">${this.legendVisible?'收起':'展开'}</button>
+        </div>
+        ${this.legendVisible ? `
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          ${phonicsLegend.map(l => `
+            <div class="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-700">
+              <span class="w-4 h-4 rounded-full inline-block" style="background:${this.dark ? getComputedClassColorDark(l.cls) : getComputedClassColor(l.cls)}"></span>
+              <div><span class="${l.cls} font-bold">${l.label}</span><br><span class="text-gray-400">${l.eg}</span></div>
+            </div>
+          `).join('')}
+        </div>` : ''}
+      </div>
+    </main>`;
+  }
+
+  toggleLegend() { this.legendVisible = !this.legendVisible; this.render(); }
+
+  modeBtn(page, icon, title, desc, color) {
+    return `<button onclick="app.goUnitSelect('${page}')" class="card-hover bg-white dark:bg-gray-800 rounded-xl shadow p-4 text-center border-b-4 border-${color}-400">
+      <div class="text-3xl mb-1">${icon}</div>
+      <div class="font-bold text-gray-800 dark:text-gray-100 text-sm">${title}</div>
+      <div class="text-xs text-gray-400 dark:text-gray-500">${desc}</div>
+    </button>`;
+  }
+
+  // ============================================================
+  // UNIT SELECT
+  // ============================================================
+  unitSelectHTML() {
+    const mode = this.targetPage;
+    const label = mode==='learn'?'单词学习':mode==='read'?'课文朗读':mode==='flash'?'单词闪卡':'练习挑战';
+    return `
+    <header class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 shadow-lg sticky top-0 z-10">
+      <div class="max-w-lg mx-auto flex items-center gap-3">
+        <button onclick="app.goHome()" class="bg-white/20 px-3 py-1 rounded-lg btn-press">←</button>
+        <h1 class="text-lg font-bold">选择单元 - ${label}</h1>
+        <button onclick="app.toggleDark()" class="ml-auto bg-white/20 px-2 py-1 rounded-full text-sm btn-press">${this.dark?'☀️':'🌙'}</button>
+        <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full text-sm btn-press" title="发音模式">${this.childVoice?'👶':'🔊'}</button>
+      </div>
+    </header>
+    <main class="max-w-lg mx-auto px-4 py-6">
+      <div class="grid grid-cols-2 gap-3">
+        ${units.map(u=>`<button onclick="app.selectUnit('${u.id}','${mode}')" class="card-hover bg-white dark:bg-gray-800 rounded-xl shadow p-4 text-center border-b-4 border-${u.color}-400">
+          <div class="text-4xl mb-2">${u.icon}</div>
+          <div class="font-bold text-sm dark:text-gray-100">${u.name}</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">${u.title}</div>
+        </button>`).join('')}
+      </div>
+      <button onclick="app.selectUnit(null,'${mode}')" class="w-full mt-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl font-bold btn-press">
+        📚 全部单元
+      </button>
+    </main>`;
+  }
+
+  goUnitSelect(page) { this.page='unitSelect'; this.targetPage=page; this.render(); }
+
+  selectUnit(uid, mode) {
+    this.unitId = uid;
+    if (mode==='learn') { this.page='learn'; this.learnIdx=0; }
+    else if (mode==='read') { this.page='read'; this.reader={idx:0,playing:false,rate:0.85}; }
+    else if (mode==='flash') { this.page='flash'; this.flash={idx:0,flipped:false}; }
+    else if (mode==='game') { this.startGame(); }
+    this.render();
+  }
+
+  goReview() {
+    const progress = load('wp', {});
+    const wrongWords = Object.entries(progress)
+      .filter(([k,v]) => v.w > v.c && v.w >= 2)
+      .map(([k]) => k);
+    // Filter unit words that are wrong
+    const allWords = units.flatMap(u=>u.words);
+    const reviewWords = allWords.filter(w => wrongWords.includes(w.w));
+    if (reviewWords.length === 0) { this.showToast('没有需要复习的单词 🎉'); return; }
+    // Start a special "review" game with only these words
+    this.page = 'game';
+    this.unitId = null;
+    const questions = reviewWords.slice(0, Math.min(reviewWords.length, 10)).map((w, i) => ({
+      type: i % 2 === 0 ? 'choose' : 'spell',
+      word: w
+    }));
+    this.game = {
+      mode:'game', hearts:5, xp:0, combo:0, maxCombo:0,
+      total: questions.length, correct:0, qIdx:0, questions,
+      curr: questions[0], selected:null, result:null, finished:false, wrongWords:[]
+    };
+    this.prepareQuestion();
+    this.render();
+  }
+
+  goHome() {
+    window.speechSynthesis?.cancel();
+    this.page='home'; this.unitId=null; this.render();
+  }
+  goLearn(uid=null) { this.page='learn'; this.unitId=uid; this.learnIdx=0; this.render(); }
+
+  // ============================================================
+  // SEARCH MODE
+  // ============================================================
+  doSearch() {
+    const input = document.getElementById('searchInput')?.value?.trim() || '';
+    if (!input) { this.showToast('请输入搜索内容'); return; }
+    this.search.query = input.toLowerCase();
+    const allWords = units.flatMap(u => u.words.map(w => ({ ...w, unit: u })));
+    this.search.results = allWords.filter(w => 
+      w.w.toLowerCase().includes(this.search.query) ||
+      w.m.toLowerCase().includes(this.search.query) ||
+      w.ex.toLowerCase().includes(this.search.query) ||
+      w.pos.toLowerCase().includes(this.search.query)
+    );
+    this.search.selectedWord = null;
+    this.page = 'search';
+    this.render();
+  }
+
+  searchHTML() {
+    const s = this.search;
+    return `
+    <header class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 shadow-lg sticky top-0 z-10">
+      <div class="max-w-lg mx-auto flex items-center gap-3">
+        <button onclick="app.goHome()" class="bg-white/20 px-3 py-1 rounded-lg btn-press">←</button>
+        <div class="flex-1 relative">
+          <input type="text" id="searchInput2" value="${s.query}" placeholder="🔍 搜索单词..." 
+            class="w-full px-4 py-2 bg-white/20 rounded-lg text-white placeholder-white/70 text-sm focus:outline-none"
+            onkeydown="if(event.key==='Enter')app.doSearch()">
+        </div>
+        <button onclick="app.doSearch()" class="bg-white/20 px-3 py-1 rounded-lg btn-press">🔍</button>
+        <button onclick="app.toggleDark()" class="bg-white/20 px-2 py-1 rounded-full text-sm btn-press">${this.dark?'☀️':'🌙'}</button>
+      </div>
+    </header>
+    <main class="max-w-lg mx-auto px-4 py-6">
+      <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">搜索结果：${s.results.length} 个单词</div>
+      
+      ${s.results.length === 0 ? `
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-8 text-center">
+          <div class="text-5xl mb-4">🔍</div>
+          <h3 class="text-lg font-bold dark:text-gray-100">没有找到匹配的单词</h3>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">试试搜索其他内容</p>
+        </div>` : `
+        <div class="space-y-2">
+          ${s.results.map((w, i) => `
+            <button onclick="app.selectSearchWord(${i})" class="w-full bg-white dark:bg-gray-800 rounded-xl shadow p-4 text-left card-hover flex items-center gap-3 ${s.selectedWord === i ? 'ring-2 ring-green-500' : ''}">
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-blue-600 dark:text-blue-400 text-lg">${w.w}</span>
+                  <span class="text-gray-400 text-sm">${w.p}</span>
+                  <span class="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full text-xs">${w.pos}</span>
+                </div>
+                <p class="text-gray-600 dark:text-gray-300 text-sm mt-1">${w.m}</p>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="text-xs text-gray-400">${w.unit.icon} ${w.unit.name}</span>
+                  <span class="text-xs text-gray-400">·</span>
+                  <span class="text-xs text-gray-400 truncate max-w-[200px]">"${w.ex}"</span>
+                </div>
+              </div>
+              <button onclick="event.stopPropagation();speak('${w.w.replace(/'/g,"\\'")}')" class="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-full">🔊</button>
+            </button>
+          `).join('')}
+        </div>`}
+
+      ${s.selectedWord !== null && s.results[s.selectedWord] ? `
+        <div class="mt-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 slide-up">
+          <div class="text-center mb-4">
+            <button onclick="speak('${s.results[s.selectedWord].w.replace(/'/g,"\\'")}')" class="bg-blue-500 text-white w-14 h-14 rounded-full text-2xl btn-press shadow-lg">🔊</button>
+          </div>
+          <div class="text-center mb-4">
+            <h2 class="text-3xl font-bold text-blue-600 dark:text-blue-400">${s.results[s.selectedWord].w}</h2>
+            <p class="text-gray-400 dark:text-gray-500 mt-1">${s.results[s.selectedWord].p}</p>
+          </div>
+          <div class="space-y-3">
+            <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-3">
+              <span class="text-xs font-bold text-indigo-400">📖 中文意思</span>
+              <p class="text-gray-700 dark:text-gray-200">${s.results[s.selectedWord].m}</p>
+            </div>
+            <div class="bg-green-50 dark:bg-green-900/20 rounded-xl p-3">
+              <span class="text-xs font-bold text-green-400">🔤 例句</span>
+              <p class="text-gray-700 dark:text-gray-200">${s.results[s.selectedWord].ex}</p>
+            </div>
+            <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-3">
+              <span class="text-xs font-bold text-yellow-500">💡 自然拼读技巧</span>
+              <p class="text-gray-700 dark:text-gray-200">${s.results[s.selectedWord].rule}</p>
+            </div>
+            <div class="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-3">
+              <span class="text-xs font-bold text-purple-400">🔗 音节拆分</span>
+              <p class="text-gray-700 dark:text-gray-200 text-lg">${colorSyllables(s.results[s.selectedWord].parts)}</p>
+            </div>
+            <div class="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-3">
+              <span class="text-xs font-bold text-orange-400">💬 记忆小贴士</span>
+              <p class="text-gray-700 dark:text-gray-200">${s.results[s.selectedWord].tips}</p>
+            </div>
+          </div>
+        </div>` : ''}
+    </main>`;
+  }
+
+  selectSearchWord(idx) {
+    this.search.selectedWord = this.search.selectedWord === idx ? null : idx;
+    this.render();
+  }
+
+  // ============================================================
+  // LEARN MODE
+  // ============================================================
+  learnHTML() {
+    const ws = this.getWords();
+    const w = ws[this.learnIdx]||ws[0];
+    const u = this.getUnit();
+    if(!w) return '<div class="p-8 text-center">暂无单词</div>';
+    return `
+    <header class="bg-gradient-to-r ${unitGrad(u)} text-white px-4 py-3 shadow-lg sticky top-0 z-10">
+      <div class="max-w-lg mx-auto flex items-center gap-3">
+        <button onclick="app.goHome()" class="bg-white/20 px-3 py-1 rounded-lg btn-press">←</button>
+        <h1 class="text-lg font-bold">📚 单词学习</h1>
+        ${u?`<span class="text-xs bg-white/20 px-2 py-1 rounded">${u.icon} ${u.name}</span>`:''}
+        <span class="ml-auto text-sm">${this.learnIdx+1}/${ws.length}</span>
+        <button onclick="app.toggleDark()" class="bg-white/20 px-2 py-1 rounded-full text-sm btn-press">${this.dark?'☀️':'🌙'}</button>
+        <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full text-sm btn-press" title="发音模式">${this.childVoice?'👶':'🔊'}</button>
+      </div>
+    </header>
+    <main class="max-w-lg mx-auto px-4 py-6">
+      <div class="word-card bg-white dark:bg-gray-800 shadow-xl p-6 slide-up relative">
+        <div class="unit-emoji-bg">${u?u.icon:'📖'}</div>
+        <div class="text-center mb-4">
+          <div class="word-emoji bounce-in mb-2">${getWordEmoji(w.w)}</div>
+          <div class="relative inline-block">
+            <button onclick="app.playWithWave('${w.w.replace(/'/g,"\\'")}',this)" class="bg-blue-500 text-white w-16 h-16 rounded-full text-2xl btn-press shadow-lg glow relative" id="speakBtn">
+              🔊 <span class="sr-only">发音</span>
+            </button>
+          </div>
+          <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">点击听发音 / 按空格键</p>
+        </div>
+        <div class="flex justify-center gap-2 mb-4">
+          <button onclick="app.speakExplain('${w.w.replace(/'/g,"\\'")}')" class="bg-amber-500 text-white px-4 py-2 rounded-xl text-sm btn-press shadow">📢 讲解</button>
+          <button onclick="app.startReadAloud('${w.w.replace(/'/g,"\\'")}')" class="bg-rose-500 text-white px-4 py-2 rounded-xl text-sm btn-press shadow">🎤 跟读</button>
+        </div>
+        ${this.recording !== undefined ? this.recordHTML() : ''}
+        <div class="text-center mb-6">
+          <h2 class="text-4xl font-bold text-blue-600 dark:text-blue-400">${w.w}</h2>
+          <p class="text-gray-400 dark:text-gray-500 text-lg mt-1">${w.p}</p>
+          <span class="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-3 py-0.5 rounded-full text-xs mt-2 inline-block">${w.pos}</span>
+        </div>
+        <div class="space-y-3">
+          <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-3">
+            <span class="text-xs font-bold text-indigo-400">📖 中文意思</span>
+            <p class="text-lg text-gray-700 dark:text-gray-200">${w.m}</p>
+          </div>
+          <div class="bg-green-50 dark:bg-green-900/20 rounded-xl p-3">
+            <span class="text-xs font-bold text-green-400">🔤 例句</span>
+            <p class="text-gray-700 dark:text-gray-200">${w.ex}</p>
+          </div>
+          <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-3">
+            <span class="text-xs font-bold text-yellow-500">💡 自然拼读技巧</span>
+            <p class="text-gray-700 dark:text-gray-200">${w.rule}</p>
+          </div>
+          <div class="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-3">
+            <span class="text-xs font-bold text-purple-400">🔗 音节拆分 <span class="font-normal text-gray-400">(点击音节跟读)</span></span>
+            <p class="text-gray-700 dark:text-gray-200 text-lg">${w.parts.split('-').map((s,i)=>{
+              const cls = getSyllableClass(s);
+              return `<span class="${cls} font-bold cursor-pointer hover:underline hover:opacity-80 transition pop-in-syl" onclick="event.stopPropagation();speakSyllable('${s.replace(/'/g,"\\'")}')" title="点击听音节发音" style="animation-delay:${i*0.12}s">${s}</span>`;
+            }).join('<span class="text-gray-300 dark:text-gray-600 mx-0.5">-</span>')}</p>
+          </div>
+          <div class="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-3">
+            <span class="text-xs font-bold text-teal-500">📝 词形变化</span>
+            <p class="text-gray-700 dark:text-gray-200 text-sm">${getWordForms(w)}</p>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-between mt-6">
+        <button onclick="app.prevWord()" class="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-6 py-3 rounded-xl font-bold btn-press">← 上一个</button>
+        <button onclick="app.nextWord()" class="bg-green-500 text-white px-6 py-3 rounded-xl font-bold btn-press">下一个 →</button>
+      </div>
+      <p class="text-center text-xs text-gray-400 dark:text-gray-600 mt-3">← → 方向键切换 · 空格键发音</p>
+    </main>`;
+  }
+  prevWord() { const ws=this.getWords(); this.learnIdx=(this.learnIdx-1+ws.length)%ws.length; this.render(); }
+  nextWord() { const ws=this.getWords(); this.learnIdx=(this.learnIdx+1)%ws.length; this.render(); }
+
+  // --- Sound wave animation on speaker ---
+  playWithWave(wordText, btn) {
+    // Add sound wave rings
+    const existing = btn.querySelectorAll('.sound-ring');
+    existing.forEach(e => e.remove());
+    for (let i = 0; i < 3; i++) {
+      const ring = document.createElement('div');
+      ring.className = 'sound-ring';
+      btn.appendChild(ring);
+    }
+    setTimeout(() => { btn.querySelectorAll('.sound-ring').forEach(e => e.remove()); }, 1500);
+    speak(wordText);
+  }
+
+  // --- Voice Explanation & Read-Aloud Scoring ---
+  speakExplain(wordText) {
+    const w = this.getWords().find(x => x.w === wordText);
+    if (!w) return speak(wordText);
+    // Chain utterances: word → phonetic → Chinese → example → rule → tip
+    const texts = [
+      {t: w.w, d: 0.8}, {t: w.p, d: 0.7},
+      {t: w.m, d: 0.6, lang: 'zh-CN'},
+      {t: w.ex, d: 0.8},
+      {t: '拼读提示：' + w.rule, d: 0.7},
+      {t: '词形变化：' + getWordForms(w), d: 0.7}
+    ];
+    window.speechSynthesis.cancel();
+    const speakNext = (i) => {
+      if (i >= texts.length) return;
+      const item = texts[i];
+      const u = new SpeechSynthesisUtterance(item.t);
+      u.lang = item.lang || 'en-US';
+      u.rate = 0.7; u.pitch = 1.2;
+      u.onend = () => setTimeout(() => speakNext(i+1), 300);
+      window.speechSynthesis.speak(u);
+    };
+    speakNext(0);
+  }
+
+  recordHTML() {
+    const r = this.recording;
+    return `
+    <div class="mt-4 p-4 rounded-2xl text-center slide-up ${r.status==='scored'?'bg-green-50 dark:bg-green-900/20':'bg-rose-50 dark:bg-rose-900/20'}">
+      ${r.status==='waiting' ? '<div class="text-lg mb-2">🔊 先听示范...</div>' : ''}
+      ${r.status==='listening' ? `
+        <div class="text-lg mb-2">🎤 请跟读... <span class="inline-block animate-pulse text-rose-500">●</span></div>
+        <div class="text-4xl font-bold text-gray-500 mb-2">${r.target}</div>
+      ` : ''}
+      ${r.status==='scored' ? `
+        <div class="text-3xl mb-2">${r.score >= 80 ? '🌟 太棒了！' : r.score >= 50 ? '👍 不错！' : '💪 再试一次！'}</div>
+        <div class="flex items-center justify-center gap-3 mb-2">
+          <div class="w-16 h-16 rounded-full border-4 flex items-center justify-center text-xl font-bold ${r.score>=80?'border-green-500 text-green-500':r.score>=50?'border-yellow-500 text-yellow-500':'border-red-500 text-red-500'}">${r.score}</div>
+        </div>
+        ${r.recognized ? `<p class="text-xs text-gray-500">识别到：「${r.recognized}」</p>` : ''}
+        <p class="text-xs text-gray-400 mt-1">目标：${r.target}</p>
+      ` : ''}
+      ${r.status==='unsupported' ? '<div class="text-sm text-gray-500">⚠️ 当前浏览器不支持语音识别（请用 Chrome/Edge）</div>' : ''}
+    </div>`;
+  }
+
+  startReadAloud(wordText) {
+    const w = this.getWords().find(x => x.w === wordText);
+    if (!w) return;
+    // Reset recording state
+    this.recording = { status:'waiting', target: w.w, score:0, recognized:'' };
+    this.render();
+    // First speak the word as example
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(w.w);
+    u.lang = 'en-US'; u.rate = 0.65; u.pitch = 1.3;
+    u.onend = () => { this.doListen(w.w); };
+    window.speechSynthesis.speak(u);
+  }
+
+  doListen(target) {
+    // Check for SpeechRecognition support
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      this.recording = { status:'unsupported', target, score:0, recognized:'' };
+      this.render();
+      return;
+    }
+    this.recording = { status:'listening', target, score:0, recognized:'' };
+    this.render();
+    const recognizer = new SR();
+    recognizer.lang = 'en-US';
+    recognizer.interimResults = false;
+    recognizer.maxAlternatives = 3;
+    recognizer.onresult = (e) => {
+      const alt = e.results[0];
+      const best = alt[0].transcript.trim().toLowerCase();
+      // Check alternatives for best match
+      let bestMatch = '';
+      let bestScore = 0;
+      for (let i = 0; i < alt.length; i++) {
+        const text = alt[i].transcript.trim().toLowerCase();
+        const score = this.fuzzyMatch(text, target.toLowerCase());
+        if (score > bestScore) { bestScore = score; bestMatch = text; }
+      }
+      this.recording = { status:'scored', target, score: bestScore, recognized: bestMatch };
+      this.render();
+      // Auto-clear after 3s
+      if (this._clearTimer) clearTimeout(this._clearTimer);
+      this._clearTimer = setTimeout(() => { this.recording = undefined; this.render(); }, 4000);
+    };
+    recognizer.onerror = () => {
+      this.recording = { status:'scored', target, score:0, recognized:'识别失败' };
+      this.render();
+    };
+    recognizer.start();
+    // Auto-stop after 4 seconds
+    setTimeout(() => { try { recognizer.stop(); } catch(e) {} }, 4000);
+  }
+
+  // Simple fuzzy matching: compare word similarity
+  fuzzyMatch(input, target) {
+    if (!input) return 0;
+    // Exact match
+    if (input === target) return 100;
+    // Remove punctuation
+    const clean = input.replace(/[.,!?'"]/g, '').trim();
+    if (clean === target) return 95;
+    // Check if target is contained in input or vice versa
+    if (clean.includes(target)) return 85;
+    if (target.includes(clean)) return 80;
+    // Word-by-word: check how many words match
+    const inWords = clean.split(/\s+/);
+    const tWords = target.split(/\s+/);
+    let matches = 0;
+    for (const tw of tWords) {
+      if (inWords.some(iw => iw === tw || iw.startsWith(tw) || tw.startsWith(iw))) matches++;
+    }
+    if (tWords.length > 0) return Math.round((matches / tWords.length) * 70);
+    // Character-level: simple overlap
+    let chars = 0;
+    for (let i = 0; i < Math.min(clean.length, target.length); i++) {
+      if (clean[i] === target[i]) chars++;
+    }
+    const maxLen = Math.max(clean.length, target.length);
+    return Math.round((chars / maxLen) * 50);
+  }
+
+  // ============================================================
+  // READING MODE
+  // ============================================================
+  readHTML() {
+    const u = this.getUnit()||units[0];
+    return `
+    <header class="bg-gradient-to-r ${unitGrad(u)} text-white px-4 py-3 shadow-lg sticky top-0 z-10">
+      <div class="max-w-lg mx-auto flex items-center gap-3">
+        <button onclick="app.goHome()" class="bg-white/20 px-3 py-1 rounded-lg btn-press">←</button>
+        <h1 class="text-lg font-bold">📖 课文朗读</h1>
+        <button onclick="app.toggleDark()" class="ml-auto bg-white/20 px-2 py-1 rounded-full text-sm btn-press">${this.dark?'☀️':'🌙'}</button>
+        <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full text-sm btn-press" title="发音模式">${this.childVoice?'👶':'🔊'}</button>
+      </div>
+    </header>
+    <main class="max-w-lg mx-auto px-4 py-6">
+      <div class="word-card bg-white dark:bg-gray-800 shadow-xl p-5 mb-4 relative">
+        <div class="unit-emoji-bg">${u?u.icon:'📖'}</div>
+        <div class="flex items-center gap-3 mb-4">
+          <span class="text-4xl">${u.icon}</span>
+          <div>
+            <h2 class="text-lg font-bold dark:text-gray-100">${u.name}: ${u.title}</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">${u.sub}</p>
+          </div>
+        </div>
+        <div class="space-y-3 mb-4">
+          ${u.text.map((s,i)=>`
+            <div id="sent-${i}" class="text-base leading-relaxed p-3 rounded-lg ${this.reader.idx===i&&this.reader.playing?'bg-yellow-100 dark:bg-yellow-900/30':'hover:bg-gray-50 dark:hover:bg-gray-700'}">
+              ${s.split(/\s+/).map(word=>{
+                const clean = word.replace(/[.,?!\"]/g,'').toLowerCase();
+                // Match base form by stripping common suffixes
+                const w = u.words.find(x=>x.w.toLowerCase()===clean)
+                  || u.words.find(x=>x.w.toLowerCase()===clean.replace(/s$/,''))
+                  || u.words.find(x=>x.w.toLowerCase()===clean.replace(/ed$/,''))
+                  || u.words.find(x=>x.w.toLowerCase()===clean.replace(/ing$/,''));
+                return w?`<span class="red-word" onclick="speak('${w.w.replace(/'/g,"\\'")}')">${word}</span>`:word;
+              }).join(' ')}
+            </div>
+          `).join('')}
+        </div>
+        <div class="flex items-center justify-center gap-3">
+          <button onclick="app.toggleRead()" class="${this.reader.playing?'bg-red-500':'bg-green-500'} text-white px-8 py-3 rounded-xl font-bold btn-press shadow-lg">
+            ${this.reader.playing?'⏸ 暂停':'▶ 播放朗读'}
+          </button>
+          <button onclick="app.resetRead()" class="bg-gray-200 dark:bg-gray-700 dark:text-gray-300 px-4 py-3 rounded-xl btn-press">🔄</button>
+        </div>
+        <div class="flex justify-center gap-2 mt-3">
+          <button onclick="app.setRate(0.6)" class="px-3 py-1 rounded-lg text-sm ${this.reader.rate===0.6?'bg-green-500 text-white':'bg-gray-100 dark:bg-gray-700 dark:text-gray-300'}">慢速</button>
+          <button onclick="app.setRate(0.85)" class="px-3 py-1 rounded-lg text-sm ${this.reader.rate===0.85?'bg-green-500 text-white':'bg-gray-100 dark:bg-gray-700 dark:text-gray-300'}">正常</button>
+          <button onclick="app.setRate(1.0)" class="px-3 py-1 rounded-lg text-sm ${this.reader.rate===1.0?'bg-green-500 text-white':'bg-gray-100 dark:bg-gray-700 dark:text-gray-300'}">快速</button>
+        </div>
+        <p class="text-center text-xs text-gray-400 dark:text-gray-600 mt-2">空格键 播放/暂停</p>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 mb-4">
+        <h3 class="font-bold text-gray-700 dark:text-gray-300 mb-3">🔤 本课单词</h3>
+        <div class="grid grid-cols-2 gap-2">
+          ${u.words.map(w=>`<div class="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg p-2">
+            <div><span class="font-bold text-red-500">${w.w}</span><br><span class="text-xs text-gray-400 dark:text-gray-500">${w.p} ${w.m}</span></div>
+            <button onclick="speak('${w.w.replace(/'/g,"\\'")}')" class="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-full">🔊</button>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow p-4">
+        <h3 class="font-bold text-gray-700 dark:text-gray-300 mb-3">📚 自然拼读规则</h3>
+        ${u.rules.map(r=>`<div class="phonetic-rule dark:border-l-yellow-600">
+          <span class="font-bold text-yellow-700 dark:text-yellow-400">${r.title}</span>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">${r.desc}</p>
+        </div>`).join('')}
+      </div>
+    </main>`;
+  }
+  toggleRead() {
+    if(this.reader.playing){ window.speechSynthesis.cancel(); this.reader.playing=false; }
+    else { this.reader.playing=true; this.playSent(); }
+    this.render();
+  }
+  playSent() {
+    const u=this.getUnit()||units[0];
+    if(this.reader.idx>=u.text.length){ this.reader.playing=false; this.showToast('朗读完成 🎉','success'); this.render(); return; }
+    const u2=speak(u.text[this.reader.idx], this.reader.rate);
+    u2.onend=()=>{ if(this.reader.playing){ this.reader.idx++; this.playSent(); } };
+    this.render();
+  }
+  resetRead(){ window.speechSynthesis.cancel(); this.reader.idx=0; this.reader.playing=false; this.render(); }
+  setRate(r){ this.reader.rate=r; if(this.reader.playing){ this.playSent(); } else { this.render(); } }
+
+  // ============================================================
+  // FLASHCARD MODE
+  // ============================================================
+  flashHTML() {
+    const ws=this.getWords();
+    const w=ws[this.flash.idx]||ws[0];
+    const u=this.getUnit();
+    if(!w) return '<div class="p-8 text-center">暂无单词</div>';
+    return `
+    <header class="bg-gradient-to-r ${unitGrad(u)} text-white px-4 py-3 shadow-lg sticky top-0 z-10">
+      <div class="max-w-lg mx-auto flex items-center gap-3">
+        <button onclick="app.goHome()" class="bg-white/20 px-3 py-1 rounded-lg btn-press">←</button>
+        <h1 class="text-lg font-bold">🃏 单词闪卡</h1>
+        ${u?`<span class="text-xs bg-white/20 px-2 py-1 rounded">${u.icon} ${u.name}</span>`:''}
+        <span class="ml-auto text-sm">${this.flash.idx+1}/${ws.length}</span>
+        <button onclick="app.toggleDark()" class="bg-white/20 px-2 py-1 rounded-full text-sm btn-press">${this.dark?'☀️':'🌙'}</button>
+        <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full text-sm btn-press" title="发音模式">${this.childVoice?'👶':'🔊'}</button>
+      </div>
+    </header>
+    <main class="max-w-lg mx-auto px-4 py-6">
+      <div class="flashcard cursor-pointer ${this.flash.flipped?'flipped':''}" onclick="app.flipFlash()">
+        <div class="flashcard-inner">
+          <!-- FRONT: English side -->
+          <div class="flashcard-front bg-gradient-to-br from-blue-400 to-indigo-500 flex flex-col items-center justify-center p-6 text-white shadow-xl">
+            <button onclick="event.stopPropagation();speak('${w.w.replace(/'/g,"\\'")}')" class="mb-4 bg-white/20 p-3 rounded-full btn-press">🔊</button>
+            <h2 class="text-4xl font-bold">${w.w}</h2>
+            <p class="text-lg mt-2 opacity-80">${w.p}</p>
+            <p class="text-lg mt-3 font-bold">${colorSyllablesInline(w.parts)}</p>
+            <p class="text-xs mt-4 opacity-60">👆 点击翻转 · 空格/回车</p>
+          </div>
+          <!-- BACK: Chinese side -->
+          <div class="flashcard-back bg-gradient-to-br from-green-400 to-emerald-500 flex flex-col items-center justify-center p-6 text-white shadow-xl">
+            <h3 class="text-2xl font-bold mb-2">${w.m}</h3>
+            <p class="text-sm opacity-80">${w.pos}</p>
+            <p class="text-sm mt-4 opacity-70">${w.ex}</p>
+            <p class="text-xs mt-3 opacity-60">${getWordForms(w)}</p>
+            <p class="text-xs mt-2 opacity-60">👆 点击翻回</p>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-between mt-6">
+        <button onclick="app.prevFlash()" class="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-6 py-3 rounded-xl font-bold btn-press">← 上一张</button>
+        <button onclick="app.nextFlash()" class="bg-green-500 text-white px-6 py-3 rounded-xl font-bold btn-press">下一张 →</button>
+      </div>
+      <p class="text-center text-xs text-gray-400 dark:text-gray-600 mt-3">← → 方向键切换 · 空格/回车翻转</p>
+    </main>`;
+  }
+  flipFlash(){ this.flash.flipped=!this.flash.flipped; this.render(); }
+  prevFlash(){ const ws=this.getWords(); this.flash.idx=(this.flash.idx-1+ws.length)%ws.length; this.flash.flipped=false; this.render(); }
+  nextFlash(){ const ws=this.getWords(); this.flash.idx=(this.flash.idx+1)%ws.length; this.flash.flipped=false; this.render(); }
+
+  // ============================================================
+  // GAME MODE
+  // ============================================================
+  startGame(level = null) {
+    this.page='game';
+    const allTypes = ['choose','listen','match','spell','order'];
+    const ws = this.getWords();
+    const questions = [];
+    const totalQs = this.unitId ? 10 : 15;
+    
+    for(let i=0; i<totalQs; i++) {
+      const t = allTypes[i % allTypes.length];
+      const w = ws[Math.floor(Math.random()*ws.length)];
+      questions.push({ type:t, word:w });
+    }
+    
+    const lockedLevels = load('lockedLevels', []);
+    const currentLevel = level || (this.unitId ? units.findIndex(u=>u.id===this.unitId)+1 : 0);
+    
+    this.game = {
+      mode:'game', level:currentLevel, hearts:5, xp:0, combo:0, maxCombo:0,
+      total:totalQs, correct:0, qIdx:0, questions,
+      curr:questions[0], selected:null, result:null, finished:false, wrongWords:[],
+      lockedLevels
+    };
+    this.prepareQuestion();
+    this.render();
+  }
+
+  prepareQuestion() {
+    const q = this.game.questions[this.game.qIdx];
+    const ws = this.getWords();
+    if (q.type === 'choose' || q.type === 'listen') {
+      const others = ws.filter(w=>w.w!==q.word.w);
+      const shuffled = shuffle(others);
+      q.options = shuffle([q.word, ...shuffled.slice(0,3)]);
+    } else if (q.type === 'match') {
+      const pool = shuffle(ws).slice(0,4);
+      q.matchPairs = pool.map(w=>({w:w.w, m:w.m}));
+      q.matchLeft = shuffle(q.matchPairs);
+      q.matchRight = shuffle(q.matchPairs);
+      q.matched = [];
+      q.selLeft = null;
+      q.selRight = null;
+      q.matchWrong = false;
+    } else if (q.type === 'order') {
+      const letters = q.word.w.split('');
+      let shuffled;
+      do {
+        shuffled = shuffle([...letters]);
+      } while (shuffled.join('') === q.word.w);
+      q.shuffledLetters = shuffled;
+      q.selectedLetters = [];
+      q.remainingLetters = [...shuffled];
+    }
+  }
+
+  gameHTML() {
+    const g = this.game;
+    // Toast display
+    const toastHtml = this.toast ? `<div class="fixed top-4 right-4 z-50 toast-in bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm">${this.toast.msg}</div>` : '';
+
+    if (g.finished) {
+      const acc = g.total>0 ? Math.round(g.correct/g.total*100) : 0;
+      const xp = load('xp',0) + g.xp;
+      save('xp', xp);
+      const oldStreak = load('streak',0);
+      const today = new Date().toDateString();
+      const lastDay = load('lastDay','');
+      let streak = oldStreak;
+      if (lastDay !== today) {
+        const yesterday = new Date(Date.now()-86400000).toDateString();
+        streak = (lastDay===yesterday) ? oldStreak+1 : 1;
+        save('streak', streak);
+        save('lastDay', today);
+      }
+      return `${toastHtml}
+      <header class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 shadow-lg sticky top-0 z-10">
+        <div class="max-w-lg mx-auto flex items-center gap-3">
+          <button onclick="app.goHome()" class="bg-white/20 px-3 py-1 rounded-lg btn-press">←</button>
+          <h1 class="text-lg font-bold">🎉 闯关完成！</h1>
+        </div>
+      </header>
+      <main class="max-w-lg mx-auto px-4 py-8">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-8 text-center pop-in relative">
+          <div class="unit-emoji-bg">${acc>=80?'🏆':acc>=60?'🥈':'💪'}</div>
+          <div class="text-7xl mb-4 ${acc>=80?'float-anim':''}">${acc>=80?'🏆':acc>=60?'🥈':'💪'}</div>
+          <h2 class="text-2xl font-bold mb-6 dark:text-gray-100">${acc>=80?'🎉 太厉害了！':acc>=60?'👍 做得不错！':'💪 继续加油！'}</h2>
+          <div class="grid grid-cols-3 gap-3 mb-6">
+            <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-2xl">
+              <div class="text-3xl font-bold text-yellow-500">${g.xp}</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">获得XP</div>
+            </div>
+            <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-2xl">
+              <div class="text-3xl font-bold text-green-500">${g.correct}/${g.total}</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">答对题数</div>
+            </div>
+            <div class="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-2xl">
+              <div class="text-3xl font-bold text-orange-500">🔥${g.maxCombo}</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">最高连击</div>
+            </div>
+          </div>
+          <div class="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-xl mb-6">
+            <p class="text-sm text-purple-600 dark:text-purple-400">🔥 连续学习 ${streak} 天 · 累计 ${xp} XP</p>
+          </div>
+          ${g.wrongWords.length > 0 ? `
+          <div class="bg-red-50 dark:bg-red-900/20 p-3 rounded-xl mb-6 text-left">
+            <p class="text-xs font-bold text-red-500 mb-1">❌ 需要复习的单词：</p>
+            <div class="flex flex-wrap gap-1">
+              ${[...new Set(g.wrongWords)].map(w => `<span class="bg-red-100 dark:bg-red-900/30 px-2 py-0.5 rounded text-sm text-red-600 dark:text-red-400">${w}</span>`).join('')}
+            </div>
+          </div>` : ''}
+          <button onclick="app.startGame()" class="bg-green-500 text-white px-8 py-3 rounded-xl font-bold btn-press w-full mb-2">🔄 再玩一次</button>
+          <button onclick="app.goHome()" class="bg-gray-200 dark:bg-gray-700 dark:text-gray-300 px-8 py-3 rounded-xl font-bold btn-press w-full">🏠 返回首页</button>
+        </div>
+      </main>`;
+    }
+
+    const q = g.curr;
+    return `${toastHtml}
+    <header class="bg-white dark:bg-gray-800 px-4 py-3 shadow sticky top-0 z-10">
+      <div class="max-w-lg mx-auto">
+        <div class="flex items-center gap-3 mb-2">
+          <button onclick="app.goHome()" class="text-gray-400 dark:text-gray-500 btn-press">✕</button>
+          <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+            <div class="h-3 rounded-full bg-green-500 progress-bar" style="width:${g.qIdx/g.total*100}%"></div>
+          </div>
+          <span class="text-red-500 font-bold">❤️ ${g.hearts}</span>
+        </div>
+        <div class="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+          <span>第 ${g.qIdx+1} / ${g.total} 题</span>
+          <span class="${g.combo>=3?'text-orange-500 font-bold':''}">${g.combo>=2?'🔥 连击 '+g.combo+' <span class="sparkle">✨</span>':''}</span>
+          <span>⭐ ${g.xp} XP</span>
+        </div>
+      </div>
+    </header>
+    <main class="max-w-lg mx-auto px-4 py-6">
+      ${g.result ? this.gameResultHTML(q) : this.gameQuestionHTML(q)}
+    </main>`;
+  }
+
+  gameQuestionHTML(q) {
+    const g = this.game;
+    if (q.type === 'choose') {
+      return `
+        <div class="slide-up">
+          <h2 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-1">选出正确的单词</h2>
+          <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">意思是：<span class="font-bold text-blue-600 dark:text-blue-400">${q.word.m}</span></p>
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            ${q.options.map(o=>`<button onclick="app.answer('${o.w.replace(/'/g,"\\'")}')" class="bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-xl py-4 font-bold text-lg btn-press hover:border-green-400 dark:text-gray-200">${o.w}</button>`).join('')}
+          </div>
+          <button onclick="speak('${q.word.w.replace(/'/g,"\\'")}')" class="text-blue-500 text-sm">🔊 听发音提示</button>
+        </div>`;
+    }
+    if (q.type === 'listen') {
+      return `
+        <div class="slide-up text-center">
+          <h2 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4">听发音，选出单词</h2>
+          <button onclick="speak('${q.word.w.replace(/'/g,"\\'")}')" class="bg-blue-500 text-white w-24 h-24 rounded-full text-4xl btn-press shadow-lg mb-6">🔊</button>
+          <div class="grid grid-cols-2 gap-3">
+            ${q.options.map(o=>`<button onclick="app.answer('${o.w.replace(/'/g,"\\'")}')" class="bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-xl py-4 font-bold text-lg btn-press hover:border-green-400 dark:text-gray-200">${o.w}</button>`).join('')}
+          </div>
+        </div>`;
+    }
+    if (q.type === 'match') {
+      return `
+        <div class="slide-up">
+          <h2 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4">将单词和意思配对</h2>
+          ${q.matchWrong ? '<div class="bg-red-50 dark:bg-red-900/20 text-red-500 p-3 rounded-xl mb-4 shake text-center text-sm">❌ 配对错误，再试一次！</div>' : ''}
+          <div class="grid grid-cols-2 gap-3 mb-6">
+            <div class="space-y-2">
+              ${q.matchLeft.map(p=>`
+                <button onclick="app.matchClick('left','${p.w.replace(/'/g,"\\'")}')" class="w-full py-3 rounded-xl font-bold btn-press ${q.matched.includes(p.w)?'bg-green-100 dark:bg-green-900/30 text-green-400 opacity-50':q.selLeft===p.w?'bg-green-500 text-white':'bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 dark:text-gray-200'}">${p.w}</button>
+              `).join('')}
+            </div>
+            <div class="space-y-2">
+              ${q.matchRight.map(p=>`
+                <button onclick="app.matchClick('right','${p.m.replace(/'/g,"\\'")}')" class="w-full py-3 rounded-xl text-sm btn-press ${q.matched.some(w=>q.matchPairs.find(x=>x.w===w)?.m===p.m)?'bg-green-100 dark:bg-green-900/30 text-green-400 opacity-50':q.selRight===p.m?'bg-green-500 text-white':'bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 dark:text-gray-200'}">${p.m}</button>
+              `).join('')}
+            </div>
+          </div>
+          <p class="text-center text-sm text-gray-400 dark:text-gray-500">${q.matched.length}/4 已配对</p>
+        </div>`;
+    }
+    if (q.type === 'spell') {
+      return `
+        <div class="slide-up text-center">
+          <h2 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-2">拼写单词</h2>
+          <button onclick="speak('${q.word.w.replace(/'/g,"\\'")}')" class="bg-blue-500 text-white w-20 h-20 rounded-full text-3xl btn-press shadow-lg mb-4">🔊</button>
+          <p class="text-gray-500 dark:text-gray-400 mb-4">意思：<span class="font-bold text-blue-600 dark:text-blue-400">${q.word.m}</span></p>
+          <input id="spellInput" type="text" placeholder="输入单词..." class="w-full px-4 py-3 text-center text-xl border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-xl focus:border-green-400 mb-4" onkeydown="if(event.key==='Enter')app.checkSpell()" autofocus>
+          <button onclick="app.checkSpell()" class="bg-green-500 text-white px-8 py-3 rounded-xl font-bold btn-press w-full">✓ 提交</button>
+        </div>`;
+    }
+    if (q.type === 'order') {
+      return `
+        <div class="slide-up text-center">
+          <h2 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-2">排列字母</h2>
+          <button onclick="speak('${q.word.w.replace(/'/g,"\\'")}')" class="bg-blue-500 text-white w-16 h-16 rounded-full text-2xl btn-press shadow-lg mb-4">🔊</button>
+          <p class="text-gray-500 dark:text-gray-400 mb-4">意思：<span class="font-bold text-blue-600 dark:text-blue-400">${q.word.m}</span></p>
+          <div class="bg-gray-100 dark:bg-gray-700 rounded-xl p-4 mb-4 min-h-[60px]">
+            <div class="flex flex-wrap justify-center gap-2">
+              ${q.selectedLetters.map((l,i)=>`
+                <button onclick="app.unselectLetter(${i})" class="w-10 h-10 bg-green-500 text-white rounded-lg font-bold text-lg btn-press shadow">${l}</button>
+              `).join('')}
+            </div>
+          </div>
+          <div class="flex flex-wrap justify-center gap-2 mb-4">
+            ${q.remainingLetters.map((l,i)=>`
+              <button onclick="app.selectLetter('${l}', ${i})" class="w-10 h-10 bg-white dark:bg-gray-600 border-2 border-gray-300 dark:border-gray-500 rounded-lg font-bold text-lg btn-press shadow">${l}</button>
+            `).join('')}
+          </div>
+          ${q.selectedLetters.join('') === q.word.w ? `
+            <button onclick="app.submitOrder()" class="bg-green-500 text-white px-8 py-3 rounded-xl font-bold btn-press w-full">✓ 提交答案</button>
+          ` : ''}
+        </div>`;
+    }
+    return '';
+  }
+
+  gameResultHTML(q) {
+    const g = this.game;
+    const msg = g.result ? cheers[Math.floor(Math.random()*cheers.length)] : oops[Math.floor(Math.random()*oops.length)];
+    return `
+      <div class="slide-up">
+        <div class="${g.result?'bg-green-50 dark:bg-green-900/20':'bg-red-50 dark:bg-red-900/20'} rounded-2xl p-6 text-center mb-4">
+          <div class="text-5xl mb-2 ${g.result?'':'shake'}">${g.result?'✅':'❌'} ${g.result && g.combo>=3?'<span class="sparkle">✨</span>':''}</div>
+          <h2 class="text-xl font-bold ${g.result?'text-green-600 dark:text-green-400':'text-red-500 dark:text-red-400'}">${msg}</h2>
+          ${!g.result?`<p class="text-gray-600 dark:text-gray-400 mt-2">正确答案：<span class="font-bold text-green-600 dark:text-green-400">${q.word.w}</span></p>
+          <p class="text-xs text-gray-500 dark:text-gray-500 mt-1">${q.word.w} - ${q.word.m}</p>`:`<p class="text-gray-600 dark:text-gray-400 mt-2">${q.word.w} - ${q.word.m}</p>`}
+        </div>
+        <button onclick="app.nextQuestion()" class="bg-green-500 text-white px-8 py-3 rounded-xl font-bold btn-press w-full">继续 → <span class="text-xs opacity-70">(按回车)</span></button>
+      </div>`;
+  }
+
+  answer(w) {
+    const g = this.game;
+    if (g.result !== null) return;
+    const correct = w === g.curr.word.w;
+    g.result = correct;
+    g.correct += correct ? 1 : 0;
+    if (correct) {
+      g.combo++;
+      g.maxCombo = Math.max(g.maxCombo, g.combo);
+      g.xp += 10 + Math.min(g.combo-1, 5) * 2;
+    } else {
+      g.combo = 0;
+      g.hearts--;
+      g.wrongWords.push(g.curr.word.w);
+    }
+    this.saveWP(g.curr.word.w, correct);
+    this.render();
+  }
+
+  matchClick(side, val) {
+    const q = this.game.curr;
+    if (q.matched.includes(val) && side==='left') return;
+    if (q.matched.some(w=>q.matchPairs.find(x=>x.w===w)?.m===val) && side==='right') return;
+
+    if (side==='left') { q.selLeft = val; }
+    else { q.selRight = val; }
+
+    // Clear wrong feedback when user clicks again
+    q.matchWrong = false;
+
+    if (q.selLeft && q.selRight) {
+      const pair = q.matchPairs.find(p=>p.w===q.selLeft);
+      if (pair && pair.m === q.selRight) {
+        // Correct match
+        q.matched.push(q.selLeft);
+        q.selLeft = null; q.selRight = null;
+        if (q.matched.length === 4) {
+          this.game.result = true;
+          this.game.correct++;
+          this.game.combo++;
+          this.game.maxCombo = Math.max(this.game.maxCombo, this.game.combo);
+          this.game.xp += 15 + Math.min(this.game.combo-1, 5) * 2;
+          q.matched.forEach(w=>this.saveWP(w, true));
+        }
+      } else {
+        // Wrong match — show feedback but don't lose hearts immediately
+        q.matchWrong = true;
+        q.selLeft = null;
+        q.selRight = null;
+        // Still track wrong but less punishing
+        this.game.combo = 0;
+        // Only lose heart after 2 wrong attempts
+        if (!q._wrongCount) q._wrongCount = 0;
+        q._wrongCount++;
+        if (q._wrongCount >= 3) {
+          this.game.hearts--;
+          q._wrongCount = 0;
+        }
+      }
+    }
+    this.render();
+  }
+
+  checkSpell() {
+    const g = this.game;
+    if (g.result !== null) return;
+    const input = (document.getElementById('spellInput')?.value || '').toLowerCase().trim();
+    const correct = input === g.curr.word.w.toLowerCase();
+    g.result = correct;
+    g.correct += correct ? 1 : 0;
+    if (correct) {
+      g.combo++;
+      g.maxCombo = Math.max(g.maxCombo, g.combo);
+      g.xp += 15 + Math.min(g.combo-1, 5) * 2;
+    } else {
+      g.combo = 0;
+      g.hearts--;
+      g.wrongWords.push(g.curr.word.w);
+    }
+    this.saveWP(g.curr.word.w, correct);
+    this.render();
+  }
+
+  selectLetter(l, idx) {
+    const q = this.game.curr;
+    if (q.result !== null) return;
+    q.selectedLetters.push(l);
+    q.remainingLetters.splice(idx, 1);
+    this.render();
+  }
+
+  unselectLetter(idx) {
+    const q = this.game.curr;
+    if (q.result !== null) return;
+    const l = q.selectedLetters.splice(idx, 1)[0];
+    q.remainingLetters.push(l);
+    this.render();
+  }
+
+  submitOrder() {
+    const g = this.game;
+    const q = g.curr;
+    if (g.result !== null) return;
+    const correct = q.selectedLetters.join('') === q.word.w;
+    g.result = correct;
+    g.correct += correct ? 1 : 0;
+    if (correct) {
+      g.combo++;
+      g.maxCombo = Math.max(g.maxCombo, g.combo);
+      g.xp += 15 + Math.min(g.combo-1, 5) * 2;
+    } else {
+      g.combo = 0;
+      g.hearts--;
+      g.wrongWords.push(q.word.w);
+    }
+    this.saveWP(q.word.w, correct);
+    this.render();
+  }
+
+  nextQuestion() {
+    const g = this.game;
+    g.qIdx++;
+    if (g.hearts <= 0 || g.qIdx >= g.total) {
+      g.finished = true;
+    } else {
+      g.curr = g.questions[g.qIdx];
+      g.result = null;
+      this.prepareQuestion();
+    }
+    this.render();
+  }
+
+  saveWP(word, correct) {
+    const w = typeof word === 'string' ? word : word.w;
+    const p = load('wp', {});
+    if (!p[w]) p[w] = { c:0, w:0, learned:false };
+    if (correct) { p[w].c++; p[w].learned = p[w].c >= 3; }
+    else p[w].w++;
+    save('wp', p);
+  }
+}
+
+// Helper: get CSS color for phonics legend (light mode)
+function getComputedClassColor(cls) {
+  const map = { 'syl-closed':'#2563EB', 'syl-open':'#DC2626', 'syl-magic-e':'#16A34A', 'syl-r-control':'#EA580C', 'syl-vowel-team':'#CA8A04', 'syl-special':'#9333EA' };
+  return map[cls] || '#6B7280';
+}
+function getComputedClassColorDark(cls) {
+  const map = { 'syl-closed':'#60A5FA', 'syl-open':'#F87171', 'syl-magic-e':'#4ADE80', 'syl-r-control':'#FB923C', 'syl-vowel-team':'#FACC15', 'syl-special':'#C084FC' };
+  return map[cls] || '#9CA3AF';
+}
+
+const app = new App();
+</script>
+</body>
+</html>
