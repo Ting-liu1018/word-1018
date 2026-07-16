@@ -1624,8 +1624,11 @@ class App {
               <button onclick="app.selectLetter('${l}', ${i})" class="w-10 h-10 bg-white dark:bg-gray-600 border-2 border-gray-300 dark:border-gray-500 rounded-lg font-bold text-lg btn-press shadow">${l}</button>
             `).join('')}
           </div>
-          ${q.selectedLetters.join('') === q.word.w ? `
+          ${q.selectedLetters.length === q.word.w.length ? `
             <button onclick="app.submitOrder()" class="bg-green-500 text-white px-8 py-3 rounded-xl font-bold btn-press w-full">✓ 提交答案</button>
+          ` : ''}
+          ${q.selectedLetters.length > 0 ? `
+            <button onclick="app.clearOrder()" class="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-4 py-2 rounded-lg text-sm btn-press mt-2">🔄 清除</button>
           ` : ''}
         </div>`;
     }
@@ -1763,6 +1766,13 @@ class App {
       g.wrongWords.push(q.word.w);
     }
     this.saveWP(q.word.w, correct);
+    this.render();
+  }
+
+  clearOrder() {
+    const q = this.game.curr;
+    q.remainingLetters = [...q.shuffledLetters];
+    q.selectedLetters = [];
     this.render();
   }
 
