@@ -764,6 +764,7 @@ class App {
       case 'flash': return this.flashHTML();
       case 'game': return this.gameHTML();
       case 'search': return this.searchHTML();
+      case 'smartSearch': return this.smartSearchHTML();
       default: return this.homeHTML();
     }
   }
@@ -824,6 +825,7 @@ class App {
         ${this.modeBtn('read','📖','课文朗读','智能朗读+逐句高亮','indigo')}
         ${this.modeBtn('flash','🃏','单词闪卡','翻转记忆+发音','pink')}
         ${this.modeBtn('game','🎮','练习挑战','多邻国风格闯关','green')}
+        ${this.smartSearchBtn()}
       </div>
 
       <h3 class="font-bold text-gray-700 dark:text-gray-300 mb-3">📂 全部单元</h3>
@@ -913,6 +915,18 @@ class App {
     </button>`;
   }
 
+  smartSearchBtn() {
+    return `<button onclick="app.goSmartSearch()" class="card-hover bg-sky-50 dark:bg-sky-900/30 rounded-xl shadow p-4 text-center border-b-4 border-sky-400">
+      <div class="text-3xl mb-1 flex justify-center">
+        <svg class="w-10 h-10 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+      </div>
+      <div class="font-bold text-sky-700 dark:text-sky-300 text-sm">智能搜索</div>
+      <div class="text-xs text-gray-400 dark:text-gray-500">查询任意英语单词</div>
+    </button>`;
+  }
+
   // ============================================================
   // UNIT SELECT
   // ============================================================
@@ -943,6 +957,14 @@ class App {
   }
 
   goUnitSelect(page) { this.page='unitSelect'; this.targetPage=page; this.render(); }
+
+  goSmartSearch() {
+    this.search.query = '';
+    this.search.results = [];
+    this.search.selectedWord = null;
+    this.page = 'smartSearch';
+    this.render();
+  }
 
   selectUnit(uid, mode) {
     this.unitId = uid;
@@ -1233,6 +1255,84 @@ class App {
   selectSearchWord(idx) {
     this.search.selectedWord = this.search.selectedWord === idx ? null : idx;
     this.render();
+  }
+
+  // ============================================================
+  // SMART SEARCH MODE
+  // ============================================================
+  smartSearchHTML() {
+    const s = this.search;
+    return `
+    <header class="bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-600 text-white px-4 py-3 shadow-lg sticky top-0 z-10">
+      <div class="max-w-lg mx-auto flex items-center gap-3">
+        <button onclick="app.goHome()" class="bg-white/20 px-3 py-1 rounded-lg btn-press">←</button>
+        <h1 class="text-lg font-bold flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+          智能搜索
+        </h1>
+        <button onclick="app.toggleDark()" class="ml-auto bg-white/20 px-2 py-1 rounded-full text-sm btn-press">${this.dark?'☀️':'🌙'}</button>
+        <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full text-sm btn-press" title="发音模式">${this.childVoice?'👶':'🔊'}</button>
+      </div>
+    </header>
+    <main class="max-w-lg mx-auto px-4 py-6">
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 mb-6">
+        <div class="flex items-center gap-3">
+          <div class="flex-1 relative">
+            <input type="text" id="quickSearch" value="${s.query}" placeholder="输入任意英语单词..." 
+              class="w-full px-4 py-3 pl-12 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-gray-200"
+              onkeydown="if(event.key==='Enter')app.quickSearch()">
+            <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+          <button onclick="app.quickSearch()" class="bg-sky-500 text-white px-6 py-3 rounded-xl font-bold btn-press shadow-lg">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </button>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">💡 支持拼写自动修正和在线词典查询</p>
+      </div>
+
+      ${s.results.length === 0 ? `
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 text-center">
+          <div class="text-6xl mb-4">🔍</div>
+          <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100">智能搜索</h3>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">输入任意英语单词，我来帮你查找释义和发音</p>
+        </div>` : `
+        <div class="space-y-3">
+          ${s.results.map((w, i) => `
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 slide-up">
+              <div class="flex items-start gap-3">
+                <button onclick="speak('${w.w.replace(/'/g,"\\'")}')" class="bg-sky-500 text-white w-12 h-12 rounded-full flex items-center justify-center btn-press flex-shrink-0 shadow-lg">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+                  </svg>
+                </button>
+                <div class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-sky-600 dark:text-sky-400 text-xl">${w.w}</span>
+                    <span class="text-gray-400 text-sm">${w.p}</span>
+                    <span class="bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 px-2 py-0.5 rounded-full text-xs">${w.pos}</span>
+                  </div>
+                  <p class="text-gray-600 dark:text-gray-300 text-sm mt-1">${w.m}</p>
+                  <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2 mt-2">
+                    <span class="text-xs font-bold text-purple-400">🔗 音节拆分：</span>
+                    <span class="text-gray-700 dark:text-gray-200">${colorSyllables(w.parts)}</span>
+                  </div>
+                  ${w.ex ? `
+                  <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-2 mt-1">
+                    <span class="text-xs font-bold text-green-400">🔤 例句：</span>
+                    <span class="text-gray-700 dark:text-gray-200 text-sm">${w.ex}</span>
+                  </div>` : ''}
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>`}
+    </main>`;
   }
 
   // ============================================================
