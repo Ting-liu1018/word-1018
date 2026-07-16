@@ -757,9 +757,6 @@ class App {
   // --- Navigation ---
   render() { 
     document.getElementById('app').innerHTML = this.html(); 
-    if (this.page === 'game' && this.game.curr?.type === 'spell') {
-      this.focusSpellInput();
-    }
   }
 
   html() {
@@ -1011,7 +1008,7 @@ class App {
     this.page = 'game';
     this.unitId = null;
     const questions = reviewWords.slice(0, Math.min(reviewWords.length, 10)).map((w, i) => ({
-      type: i % 2 === 0 ? 'choose' : 'spell',
+      type: i % 3 === 0 ? 'choose' : (i % 3 === 1 ? 'listen' : 'match'),
       word: w
     }));
     this.game = {
@@ -2076,7 +2073,7 @@ class App {
     }
     
     this.page='game';
-    const allTypes = ['choose','listen','match','spell','order'];
+    const allTypes = ['choose','listen','match','order'];
     const ws = this.getWords();
     const questions = [];
     const totalQs = this.unitId ? 10 : 15;
@@ -2262,16 +2259,6 @@ class App {
           <p class="text-center text-sm text-gray-400 dark:text-gray-500">${q.matched.length}/4 已配对</p>
         </div>`;
     }
-    if (q.type === 'spell') {
-      return `
-        <div class="slide-up text-center">
-          <h2 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-2">拼写单词</h2>
-          <button onclick="speak('${q.word.w.replace(/'/g,"\\'")}')" class="bg-blue-500 text-white w-20 h-20 rounded-full text-3xl btn-press shadow-lg mb-4">🔊</button>
-          <p class="text-gray-500 dark:text-gray-400 mb-4">意思：<span class="font-bold text-blue-600 dark:text-blue-400">${q.word.m}</span></p>
-          <input id="spellInput" type="text" placeholder="输入单词..." class="w-full px-4 py-3 text-center text-xl border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-xl focus:border-green-400 mb-4" onkeydown="if(event.key==='Enter')app.checkSpell()" autofocus>
-          <button onclick="app.checkSpell()" class="bg-green-500 text-white px-8 py-3 rounded-xl font-bold btn-press w-full">✓ 提交</button>
-        </div>`;
-    }
     if (q.type === 'order') {
       return `
         <div class="slide-up text-center">
@@ -2377,36 +2364,6 @@ class App {
       }
     }
     this.render();
-  }
-
-  checkSpell() {
-    const g = this.game;
-    if (g.result !== null) return;
-    const input = (document.getElementById('spellInput')?.value || '').toLowerCase().trim();
-    const correct = input === g.curr.word.w.toLowerCase();
-    g.result = correct;
-    g.correct += correct ? 1 : 0;
-    if (correct) {
-      g.combo++;
-      g.maxCombo = Math.max(g.maxCombo, g.combo);
-      g.xp += 15 + Math.min(g.combo-1, 5) * 2;
-    } else {
-      g.combo = 0;
-      g.hearts--;
-      g.wrongWords.push(g.curr.word.w);
-    }
-    this.saveWP(g.curr.word.w, correct);
-    this.render();
-  }
-
-  focusSpellInput() {
-    setTimeout(() => {
-      const input = document.getElementById('spellInput');
-      if (input) {
-        input.focus();
-        input.select();
-      }
-    }, 100);
   }
 
   selectLetter(l, idx) {
