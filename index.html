@@ -694,6 +694,7 @@ class App {
       selected:null, result:null, finished:false, wrongWords:[]
     };
     this.search = { query:'', results:[], selectedWord:null };
+    this.searchHistory = load('searchHistory', []);
     this.toast = null;
     this.legendVisible = false;
     this.childVoice = load('childVoice', true);
@@ -1013,6 +1014,8 @@ class App {
     const input = document.getElementById('quickSearch')?.value?.trim() || '';
     if (!input) return;
     
+    this.addToHistory(input);
+    
     const allWords = units.flatMap(u => u.words.map(w => ({ ...w, unit: u })));
     const exactMatch = allWords.find(w => w.w.toLowerCase() === input.toLowerCase());
     
@@ -1020,7 +1023,7 @@ class App {
       this.search.query = input;
       this.search.results = [exactMatch];
       this.search.selectedWord = 0;
-      this.page = 'search';
+      this.page = 'smartSearch';
       this.render();
     } else {
       const corrected = this.correctSpelling(input);
@@ -1031,7 +1034,7 @@ class App {
           this.search.query = corrected;
           this.search.results = [correctedMatch];
           this.search.selectedWord = 0;
-          this.page = 'search';
+          this.page = 'smartSearch';
           this.render();
         } else {
           this.searchWordOnline(corrected);
@@ -1040,6 +1043,18 @@ class App {
         this.searchWordOnline(input);
       }
     }
+  }
+
+  addToHistory(word) {
+    this.searchHistory = this.searchHistory.filter(w => w.toLowerCase() !== word.toLowerCase());
+    this.searchHistory.unshift(word);
+    this.searchHistory = this.searchHistory.slice(0, 3);
+    save('searchHistory', this.searchHistory);
+  }
+
+  searchFromHistory(word) {
+    document.getElementById('quickSearch')?.setAttribute('value', word);
+    this.quickSearch();
   }
 
   correctSpelling(word) {
@@ -1294,6 +1309,15 @@ class App {
           </button>
         </div>
         <p class="text-xs text-gray-400 mt-2">💡 支持拼写自动修正和在线词典查询</p>
+        ${this.searchHistory.length > 0 ? `
+        <div class="flex items-center gap-2 mt-3">
+          <span class="text-xs text-gray-400">📜 历史记录：</span>
+          ${this.searchHistory.map(word => `
+            <button onclick="app.searchFromHistory('${word.replace(/'/g,"\\'")}')" class="bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 px-3 py-1 rounded-full text-xs btn-press">
+              ${word}
+            </button>
+          `).join('')}
+        </div>` : ''}
       </div>
 
       ${s.results.length === 0 ? `
