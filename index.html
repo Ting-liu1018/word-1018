@@ -755,7 +755,12 @@ class App {
   }
 
   // --- Navigation ---
-  render() { document.getElementById('app').innerHTML = this.html(); }
+  render() { 
+    document.getElementById('app').innerHTML = this.html(); 
+    if (this.page === 'game' && this.game.curr?.type === 'spell') {
+      this.focusSpellInput();
+    }
+  }
 
   html() {
     switch(this.page) {
