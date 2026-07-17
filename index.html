@@ -84,6 +84,38 @@
     .dark .syl-r-control { color: #FB923C; }
     .dark .syl-vowel-team { color: #FACC15; }
     .dark .syl-special { color: #C084FC; }
+
+    /* Theme styles */
+    .theme-snow { --theme-primary: #60A5FA; --theme-secondary: #93C5FD; --theme-accent: #DBEAFE; }
+    .theme-snow .card-hover { background: linear-gradient(135deg, #EFF6FF, #DBEAFE); border-color: #60A5FA; }
+    .theme-snow .bg-white { background: linear-gradient(135deg, #EFF6FF, #FFFFFF); }
+    .theme-ocean { --theme-primary: #0EA5E9; --theme-secondary: #38BDF8; --theme-accent: #E0F2FE; }
+    .theme-ocean .card-hover { background: linear-gradient(135deg, #E0F2FE, #BAE6FD); border-color: #0EA5E9; }
+    .theme-forest { --theme-primary: #22C55E; --theme-secondary: #4ADE80; --theme-accent: #DCFCE7; }
+    .theme-forest .card-hover { background: linear-gradient(135deg, #DCFCE7, #BBF7D0); border-color: #22C55E; }
+    .theme-fire { --theme-primary: #EF4444; --theme-secondary: #F87171; --theme-accent: #FEE2E2; }
+    .theme-fire .card-hover { background: linear-gradient(135deg, #FEE2E2, #FECACA); border-color: #EF4444; }
+    .theme-sakura { --theme-primary: #EC4899; --theme-secondary: #F472B6; --theme-accent: #FCE7F3; }
+    .theme-sakura .card-hover { background: linear-gradient(135deg, #FCE7F3, #FBCFE8); border-color: #EC4899; }
+    .theme-rainbow { background: linear-gradient(135deg, #FEF3C7, #FCE7F3, #DBEAFE, #DCFCE7); }
+    .theme-night { background: linear-gradient(135deg, #1E3A5F, #111827); }
+    .theme-night .bg-white { background: rgba(31, 41, 55, 0.9); }
+    .theme-candy { --theme-primary: #F472B6; --theme-secondary: #C084FC; --theme-accent: #FDE68A; }
+    .theme-candy .card-hover { background: linear-gradient(135deg, #FDE68A, #FBCFE8); border-color: #F472B6; }
+    .theme-starlight { background: linear-gradient(180deg, #0F172A, #1E1B4B); }
+    .theme-starlight .bg-white { background: rgba(30, 27, 75, 0.9); color: #E2E8F0; }
+    .theme-space { background: linear-gradient(180deg, #000000, #1E3A5F); }
+    .theme-space .bg-white { background: rgba(30, 58, 95, 0.9); color: #E2E8F0; }
+    .theme-butterfly { --theme-primary: #A855F7; --theme-secondary: #C084FC; --theme-accent: #F3E8FF; }
+    .theme-butterfly .card-hover { background: linear-gradient(135deg, #F3E8FF, #E9D5FF); border-color: #A855F7; }
+    .theme-mushroom { --theme-primary: #F97316; --theme-secondary: #FDBA74; --theme-accent: #FFF7ED; }
+    .theme-mushroom .card-hover { background: linear-gradient(135deg, #FFF7ED, #FFEDD5); border-color: #F97316; }
+    .theme-circus { --theme-primary: #DC2626; --theme-secondary: #FBBF24; --theme-accent: #FEF3C7; }
+    .theme-circus .card-hover { background: linear-gradient(135deg, #FEF3C7, #FEE2E2); border-color: #DC2626; }
+    .theme-lucky { --theme-primary: #16A34A; --theme-secondary: #22C55E; --theme-accent: #BBF7D0; }
+    .theme-lucky .card-hover { background: linear-gradient(135deg, #BBF7D0, #DCFCE7); border-color: #16A34A; }
+    .theme-art { --theme-primary: #8B5CF6; --theme-secondary: #EC4899; --theme-accent: #FDE68A; }
+    .theme-art .card-hover { background: linear-gradient(135deg, #FDE68A, #FBCFE8, #E9D5FF); border-color: #8B5CF6; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen dark:bg-gray-900 dark:text-gray-100">
@@ -755,8 +787,22 @@ class App {
   }
 
   // --- Navigation ---
-  render() { 
-    document.getElementById('app').innerHTML = this.html(); 
+  render() {
+    document.getElementById('app').innerHTML = this.html();
+    this.applyTheme();
+  }
+
+  applyTheme() {
+    const activeTheme = load('activeTheme', 'default');
+    document.body.className = 'min-h-screen';
+    if (activeTheme !== 'default') {
+      document.body.classList.add('theme-' + activeTheme);
+    }
+    if (this.dark) {
+      document.body.classList.add('dark', 'bg-gray-900', 'text-gray-100');
+    } else {
+      document.body.classList.add('bg-gray-50');
+    }
   }
 
   html() {
@@ -805,7 +851,7 @@ class App {
           <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="切换发音模式">${this.childVoice?'👶':'🔊'}</button>
           <span class="bg-white/20 px-2 py-1 rounded-full text-xs">📚 ${units.length}单元</span>
           <span class="bg-white/20 px-2 py-1 rounded-full text-xs">🔥 ${streak}天</span>
-          <span class="bg-white/20 px-2 py-1 rounded-full">⭐ ${xp} XP</span>
+          <button onclick="app.convertXP()" class="bg-yellow-400/90 px-2 py-1 rounded-full text-xs btn-press font-bold" title="点击将50 XP转换为1颗星星">⭐ ${xp} XP</button>
         </div>
       </div>
     </header>
@@ -913,12 +959,87 @@ class App {
 
   toggleLegend() { this.legendVisible = !this.legendVisible; this.render(); }
 
+  convertXP() {
+    let xp = load('xp', 0);
+    if (xp < 50) {
+      this.showToast(`⭐ XP不足50，无法转换（当前${xp}）`, 'error');
+      return;
+    }
+    const convertCount = Math.floor(xp / 50);
+    xp -= convertCount * 50;
+    save('xp', xp);
+
+    let stars = load('stars', 0);
+    stars += convertCount;
+    save('stars', stars);
+
+    this.showToast(`🎉 已将 ${convertCount * 50} XP 转换为 ${convertCount} 颗星星！`, 'success');
+    this.render();
+  }
+
   modeBtn(page, icon, title, desc, color) {
+    // 闯关模式显示爱心信息
+    if (page === 'game') {
+      this.checkHeartRecovery();
+      const hearts = load('gameHearts', 5);
+      const maxHearts = load('maxHearts', 5);
+      const heartLostTime = load('heartLostTime', []);
+      const now = Date.now();
+      const fiveMinutes = 5 * 60 * 1000;
+
+      // 计算下一个爱心恢复时间
+      let nextRecovery = null;
+      if (hearts < maxHearts && heartLostTime.length > 0) {
+        const oldestLost = heartLostTime[0];
+        nextRecovery = Math.max(0, fiveMinutes - (now - oldestLost));
+      }
+
+      const heartDisplay = '❤️'.repeat(hearts) + '🖤'.repeat(maxHearts - hearts);
+      const recoveryText = nextRecovery !== null && nextRecovery > 0
+        ? `<div class="text-xs text-green-500 mt-1">⏱️ ${Math.ceil(nextRecovery/60000)}分钟后+❤️</div>`
+        : (hearts < maxHearts ? `<div class="text-xs text-green-500 mt-1">⏱️ 恢复中...</div>` : '');
+
+      return `<button onclick="app.goUnitSelect('${page}')" class="card-hover bg-white dark:bg-gray-800 rounded-xl shadow p-4 text-center border-b-4 border-${color}-400">
+        <div class="text-3xl mb-1">${icon}</div>
+        <div class="font-bold text-gray-800 dark:text-gray-100 text-sm">${title}</div>
+        <div class="text-xs text-gray-400 dark:text-gray-500">${desc}</div>
+        <div class="mt-2 text-lg">${heartDisplay}</div>
+        ${recoveryText}
+      </button>`;
+    }
+
     return `<button onclick="app.goUnitSelect('${page}')" class="card-hover bg-white dark:bg-gray-800 rounded-xl shadow p-4 text-center border-b-4 border-${color}-400">
       <div class="text-3xl mb-1">${icon}</div>
       <div class="font-bold text-gray-800 dark:text-gray-100 text-sm">${title}</div>
       <div class="text-xs text-gray-400 dark:text-gray-500">${desc}</div>
     </button>`;
+  }
+
+  checkHeartRecovery() {
+    const hearts = load('gameHearts', 5);
+    const maxHearts = load('maxHearts', 5);
+    const heartLostTime = load('heartLostTime', []);
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+
+    if (hearts >= maxHearts) return;
+
+    let recovered = 0;
+    const newLostTime = [];
+
+    for (const lostTime of heartLostTime) {
+      if (now - lostTime >= fiveMinutes) {
+        recovered++;
+      } else {
+        newLostTime.push(lostTime);
+      }
+    }
+
+    if (recovered > 0) {
+      const newHearts = Math.min(maxHearts, hearts + recovered);
+      save('gameHearts', newHearts);
+      save('heartLostTime', newLostTime);
+    }
   }
 
   smartSearchBtn() {
@@ -1696,17 +1817,51 @@ class App {
     const isTheme = bp.type.startsWith('theme_');
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
-    
+
     let statusHTML = '';
-    if (isTheme && bp.usedAt) {
-      const expireTime = bp.usedAt + oneDayMs;
-      const remaining = expireTime - now;
-      if (remaining > 0) {
-        const hours = Math.floor(remaining / (60 * 60 * 1000));
-        statusHTML = `<span class="text-xs text-green-500">使用中 (${hours}小时后过期)</span>`;
+    let buttonsHTML = '';
+
+    if (isTheme) {
+      const activeTheme = load('activeTheme', 'default');
+      const themeMap = {
+        'theme_rainbow': 'rainbow',
+        'theme_night': 'night',
+        'theme_sakura': 'sakura',
+        'theme_ocean': 'ocean',
+        'theme_fire': 'fire',
+        'theme_forest': 'forest',
+        'theme_snow': 'snow',
+        'theme_lucky': 'lucky',
+        'theme_art': 'art',
+        'theme_starlight': 'starlight',
+        'theme_candy': 'candy',
+        'theme_butterfly': 'butterfly',
+        'theme_mushroom': 'mushroom',
+        'theme_circus': 'circus',
+        'theme_space': 'space',
+      };
+      const themeName = themeMap[bp.type];
+      const isActive = activeTheme === themeName;
+
+      if (isActive) {
+        if (bp.usedAt) {
+          const remaining = (bp.usedAt + oneDayMs) - now;
+          if (remaining > 0) {
+            const hours = Math.floor(remaining / (60 * 60 * 1000));
+            statusHTML = `<span class="text-xs text-green-500">✅ 使用中 (${hours}小时后过期)</span>`;
+          } else {
+            statusHTML = `<span class="text-xs text-gray-400">已过期</span>`;
+          }
+        }
+        buttonsHTML = `<button onclick="app.cancelTheme('${bp.id}')" class="bg-yellow-500 text-white px-3 py-1 rounded-lg text-xs btn-press font-bold">取消</button>`;
       } else {
-        statusHTML = `<span class="text-xs text-gray-400">已过期</span>`;
+        buttonsHTML = `<button onclick="app.useBackpackItem('${bp.id}')" class="bg-green-500 text-white px-3 py-1 rounded-lg text-xs btn-press font-bold">使用</button>`;
       }
+    } else {
+      buttonsHTML = `
+        <button onclick="app.useBackpackItem('${bp.id}')" class="bg-green-500 text-white px-3 py-1 rounded-lg text-xs btn-press font-bold">使用</button>
+        <button onclick="app.removeBackpackItem('${bp.id}')" class="bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-lg text-xs btn-press">🗑️</button>
+      `;
     }
 
     return `
@@ -1717,11 +1872,14 @@ class App {
           <div class="text-xs text-gray-400">${bp.desc}</div>
           ${statusHTML}
         </div>
-        <div class="flex gap-1">
-          <button onclick="app.useBackpackItem('${bp.id}')" class="bg-green-500 text-white px-3 py-1 rounded-lg text-xs btn-press font-bold">使用</button>
-          <button onclick="app.removeBackpackItem('${bp.id}')" class="bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-lg text-xs btn-press">🗑️</button>
-        </div>
+        <div class="flex gap-1">${buttonsHTML}</div>
       </div>`;
+  }
+
+  cancelTheme(itemId) {
+    save('activeTheme', 'default');
+    this.showToast('🎨 已取消主题', 'success');
+    this.render();
   }
 
   useBackpackItem(itemId) {
@@ -1784,21 +1942,50 @@ class App {
 
   applyBackpackItem(bp) {
     switch(bp.type) {
+      // 基础商品
+      case 'heart':
+        let hearts1 = load('gameHearts', 5);
+        hearts1++;
+        save('gameHearts', hearts1);
+        this.showToast('❤️ 爱心+1！', 'success');
+        break;
+      case 'hearts':
+        let hearts3 = load('gameHearts', 5);
+        hearts3 += 3;
+        save('gameHearts', hearts3);
+        this.showToast('❤️❤️❤️ 爱心+3！', 'success');
+        break;
+      case 'hint':
+        let hints = load('hints', 0);
+        hints++;
+        save('hints', hints);
+        this.showToast('💡 提示卡+1！闯关时可用', 'success');
+        break;
+      case 'doubleStars':
+        save('doubleStars', true);
+        this.showToast('⭐⭐ 下一关星星翻倍！', 'success');
+        break;
+      // 今日新品
       case 'random':
         const rand = Math.random();
-        if (rand < 0.3) {
+        if (rand < 0.25) {
           let hearts = load('gameHearts', 5);
           hearts += 3;
           save('gameHearts', hearts);
-          this.showToast('🎁 获得爱心+3！', 'success');
-        } else if (rand < 0.6) {
+          this.showToast('🎁 神秘礼物：爱心+3！', 'success');
+        } else if (rand < 0.5) {
           let stars = load('stars', 0);
           stars += 5;
           save('stars', stars);
-          this.showToast('🎁 获得星星+5！', 'success');
+          this.showToast('🎁 神秘礼物：星星+5！', 'success');
+        } else if (rand < 0.75) {
+          let hints = load('hints', 0);
+          hints++;
+          save('hints', hints);
+          this.showToast('🎁 神秘礼物：提示卡+1！', 'success');
         } else {
           save('doubleStars', true);
-          this.showToast('🎁 获得双倍星星！', 'success');
+          this.showToast('🎁 神秘礼物：双倍星星！', 'success');
         }
         break;
       case 'tripleStars':
@@ -1812,13 +1999,13 @@ class App {
         let curHearts = load('gameHearts', 5);
         curHearts++;
         save('gameHearts', curHearts);
-        this.showToast('💖 永久爱心+1！', 'success');
+        this.showToast('💖 永久爱心上限+1！', 'success');
         break;
       case 'starBonus':
         let stars = load('stars', 0);
         stars += 5;
         save('stars', stars);
-        this.showToast('💎 获得5颗星星！', 'success');
+        this.showToast('💎 星星+5！', 'success');
         break;
       case 'timeBonus':
         save('timeBonus', true);
@@ -1852,59 +2039,66 @@ class App {
   }
 
   buyHeart() {
-    this.buyItem(1, 'heart', () => {
-      this.game.hearts++;
-      save('gameHearts', this.game.hearts);
-      this.showToast('❤️ 购买成功！已恢复1颗爱心', 'success');
-      this.render();
+    this.buyToBackpack({
+      id: 'heart_' + Date.now(),
+      name: '❤️ 爱心',
+      icon: '❤️',
+      type: 'heart',
+      desc: '恢复1颗爱心，继续闯关！',
+      price: 1
     });
   }
 
   buyHearts() {
-    this.buyItem(2, 'hearts', () => {
-      this.game.hearts = (this.game.hearts || 0) + 3;
-      save('gameHearts', this.game.hearts);
-      this.showToast('❤️❤️❤️ 购买成功！已恢复3颗爱心', 'success');
-      this.render();
-    });
-  }
-
-  buyStar() {
-    this.buyItem(2, 'star', () => {
-      let stars = load('stars', 0);
-      stars++;
-      save('stars', stars);
-      this.showToast('⭐ 购买成功！已恢复1颗星星', 'success');
-      this.render();
-    });
-  }
-
-  buyStars() {
-    this.buyItem(8, 'stars', () => {
-      let stars = load('stars', 0);
-      stars += 5;
-      save('stars', stars);
-      this.showToast('⭐⭐⭐ 购买成功！已恢复5颗星星', 'success');
-      this.render();
+    this.buyToBackpack({
+      id: 'hearts_' + Date.now(),
+      name: '❤️❤️ 爱心x3',
+      icon: '❤️❤️❤️',
+      type: 'hearts',
+      desc: '恢复3颗爱心，畅玩不停！',
+      price: 2
     });
   }
 
   buyHint() {
-    this.buyItem(3, 'hint', () => {
-      let hints = load('hints', 0);
-      hints++;
-      save('hints', hints);
-      this.showToast('💡 购买成功！获得1张提示卡', 'success');
-      this.render();
+    this.buyToBackpack({
+      id: 'hint_' + Date.now(),
+      name: '💡 提示卡',
+      icon: '💡',
+      type: 'hint',
+      desc: '闯关时可以获得1次提示',
+      price: 3
     });
   }
 
   buyDouble() {
-    this.buyItem(5, 'double', () => {
-      save('doubleStars', true);
-      this.showToast('⭐⭐ 购买成功！下一关获得双倍星星', 'success');
-      this.render();
+    this.buyToBackpack({
+      id: 'double_' + Date.now(),
+      name: '⭐ 双倍星星',
+      icon: '⭐⭐',
+      type: 'doubleStars',
+      desc: '下一关获得双倍星星奖励',
+      price: 5
     });
+  }
+
+  buyToBackpack(item) {
+    let stars = load('stars', 0);
+    if (stars < item.price) {
+      this.showToast('⭐ 星星不足！', 'error');
+      return;
+    }
+    stars -= item.price;
+    save('stars', stars);
+
+    let backpack = load('backpack', []);
+    backpack.push({
+      ...item,
+      boughtAt: Date.now()
+    });
+    save('backpack', backpack);
+    this.showToast(`🎒 已放入背包：${item.name}`, 'success');
+    this.render();
   }
 
   buyItem(price, itemName, onSuccess) {
@@ -2285,27 +2479,28 @@ class App {
   // GAME MODE
   // ============================================================
   startGame(level = null) {
+    this.checkHeartRecovery();
     const savedHearts = load('gameHearts', 5);
+    // 爱心为0时提示但允许继续游戏
     if (savedHearts <= 0) {
-      this.showToast('❤️ 爱心不足！请前往商店购买爱心', 'error');
-      return;
+      this.showToast('❤️ 爱心为0，错题将无法继续！', 'error');
     }
-    
+
     this.page='game';
     const allTypes = ['choose','choose','listen','choose','match','choose'];
     const ws = this.getWords();
     const questions = [];
     const totalQs = this.unitId ? 10 : 15;
-    
+
     for(let i=0; i<totalQs; i++) {
       const t = allTypes[i % allTypes.length];
       const w = ws[Math.floor(Math.random()*ws.length)];
       questions.push({ type:t, word:w });
     }
-    
+
     const lockedLevels = load('lockedLevels', []);
     const currentLevel = level || (this.unitId ? units.findIndex(u=>u.id===this.unitId)+1 : 0);
-    
+
     this.game = {
       mode:'game', level:currentLevel, hearts:savedHearts, xp:0, combo:0, maxCombo:0,
       total:totalQs, correct:0, qIdx:0, questions,
@@ -2499,16 +2694,14 @@ class App {
       g.xp += 10 + Math.min(g.combo-1, 5) * 2;
     } else {
       g.combo = 0;
-      // 优先扣星星，星星为0则扣爱心
-      let stars = load('stars', 0);
-      if (stars > 0) {
-        stars--;
-        save('stars', stars);
-        this.showToast('⭐ 答错了！扣除1颗星星', 'error');
-      } else {
-        g.hearts--;
-        this.showToast('💔 答错了！爱心不足', 'error');
-      }
+      // 每错一题扣一颗爱心
+      g.hearts--;
+      save('gameHearts', g.hearts);
+      // 记录爱心消耗时间
+      let heartLostTime = load('heartLostTime', []);
+      heartLostTime.push(Date.now());
+      save('heartLostTime', heartLostTime);
+      this.showToast('💔 答错了！爱心-1', 'error');
       g.wrongWords.push(g.curr.word.w);
     }
     this.saveWP(g.curr.word.w, correct);
