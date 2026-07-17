@@ -844,8 +844,12 @@ class App {
   toggleBGM() {
     if (this.bgm) {
       if (this.bgm.paused) {
-        this.bgm.play();
-        this.showToast('🎵 背景音乐已开启', 'success');
+        this.bgm.play().then(() => {
+          this.showToast('🎵 背景音乐已开启', 'success');
+        }).catch(e => {
+          console.error('BGM play error:', e);
+          this.showToast('❌ 无法播放音乐', 'error');
+        });
       } else {
         this.bgm.pause();
         this.showToast('🔇 背景音乐已暂停', 'success');
@@ -1944,10 +1948,17 @@ class App {
         buttonsHTML = `<button onclick="app.useBackpackItem('${bp.id}')" class="bg-green-500 text-white px-3 py-1 rounded-lg text-xs btn-press font-bold">使用</button>`;
       }
     } else {
-      buttonsHTML = `
-        <button onclick="app.useBackpackItem('${bp.id}')" class="bg-green-500 text-white px-3 py-1 rounded-lg text-xs btn-press font-bold">使用</button>
-        <button onclick="app.removeBackpackItem('${bp.id}')" class="bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-lg text-xs btn-press">🗑️</button>
-      `;
+      if (bp.type === 'music') {
+        const isPlaying = this.bgm && !this.bgm.paused;
+        buttonsHTML = `
+          <button onclick="app.toggleBGM()" class="bg-${isPlaying ? 'red' : 'green'}-500 text-white px-3 py-1 rounded-lg text-xs btn-press font-bold">${isPlaying ? '暂停' : '播放'}</button>
+        `;
+      } else {
+        buttonsHTML = `
+          <button onclick="app.useBackpackItem('${bp.id}')" class="bg-green-500 text-white px-3 py-1 rounded-lg text-xs btn-press font-bold">使用</button>
+          <button onclick="app.removeBackpackItem('${bp.id}')" class="bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-lg text-xs btn-press">🗑️</button>
+        `;
+      }
     }
 
     return `
