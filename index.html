@@ -2007,8 +2007,11 @@ class App {
     } else {
       // 非主题商品：立即使用并从背包移除
       this.applyBackpackItem(bp);
-      backpack.splice(bpIndex, 1);
-      save('backpack', backpack);
+      // 音乐商品使用后保留在背包中，显示播放状态
+      if (bp.type !== 'music') {
+        backpack.splice(bpIndex, 1);
+        save('backpack', backpack);
+      }
     }
     
     this.render();
@@ -2896,6 +2899,13 @@ function getComputedClassColorDark(cls) {
 }
 
 const app = new App();
+
+document.addEventListener('click', () => {
+  const expireTime = load('bgmExpireTime', 0);
+  if (expireTime > Date.now() && !app.bgm) {
+    app.startBackgroundMusic();
+  }
+}, { once: true });
 </script>
 </body>
 </html>
