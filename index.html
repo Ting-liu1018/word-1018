@@ -807,28 +807,46 @@ class App {
 
   startBackgroundMusic() {
     if (this.bgm) {
-      this.bgm.pause();
+      this.bgm.stop();
       this.bgm = null;
     }
     
-    const bgmUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
-    this.bgm = new Audio(bgmUrl);
-    this.bgm.loop = true;
-    this.bgm.volume = 0.3;
-    this.bgm.crossOrigin = 'anonymous';
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    this.bgm = new AudioContext();
     
-    this.bgm.addEventListener('loadeddata', () => {
-      this.bgm.play().then(() => {
-        this.showToast('🎵 背景音乐已播放！', 'success');
-      }).catch(e => {
-        console.error('BGM play error:', e);
-        this.showToast('🔊 请点击页面开启音乐', 'info');
-      });
-    });
+    const playNote = (freq, duration, time) => {
+      const osc = this.bgm.createOscillator();
+      const gain = this.bgm.createGain();
+      osc.connect(gain);
+      gain.connect(this.bgm.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.05, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+      osc.start(time);
+      osc.stop(time + duration);
+    };
     
-    this.bgm.addEventListener('error', (e) => {
-      console.error('BGM load error:', e);
-      this.showToast('❌ 音乐加载失败', 'error');
+    const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+    let noteIndex = 0;
+    let startTime = this.bgm.currentTime;
+    
+    const playLoop = () => {
+      if (!this.bgm) return;
+      const now = this.bgm.currentTime;
+      const note = notes[noteIndex % notes.length];
+      playNote(note, 0.5, now);
+      playNote(note * 1.5, 0.3, now + 0.3);
+      noteIndex++;
+      this.bgmTimeout = setTimeout(playLoop, 800);
+    };
+    
+    this.bgm.resume().then(() => {
+      playLoop();
+      this.showToast('🎵 背景音乐已播放！', 'success');
+    }).catch(e => {
+      console.error('BGM error:', e);
+      this.showToast('🔊 请点击页面开启音乐', 'info');
     });
 
     save('bgmExpireTime', Date.now() + 24 * 60 * 60 * 1000);
@@ -843,16 +861,23 @@ class App {
 
   toggleBGM() {
     if (this.bgm) {
-      if (this.bgm.paused) {
-        this.bgm.play().then(() => {
+      if (this.bgm.state === 'suspended') {
+        this.bgm.resume().then(() => {
           this.showToast('🎵 背景音乐已开启', 'success');
         }).catch(e => {
-          console.error('BGM play error:', e);
+          console.error('BGM resume error:', e);
           this.showToast('❌ 无法播放音乐', 'error');
         });
-      } else {
-        this.bgm.pause();
+      } else if (this.bgm.state === 'running') {
+        this.bgm.suspend();
         this.showToast('🔇 背景音乐已暂停', 'success');
+      } else {
+        const expireTime = load('bgmExpireTime', 0);
+        if (expireTime > Date.now()) {
+          this.startBackgroundMusic();
+        } else {
+          this.showToast('🎵 背景音乐已过期，请前往商店购买', 'error');
+        }
       }
     } else {
       const expireTime = load('bgmExpireTime', 0);
@@ -909,7 +934,7 @@ class App {
         <div class="flex items-center gap-2 text-sm">
           <button onclick="app.toggleDark()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="深色模式">${this.dark?'☀️':'🌙'}</button>
           <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="切换发音模式">${this.childVoice?'👶':'🔊'}</button>
-          <button onclick="app.toggleBGM()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="背景音乐">${this.bgm?'🔇':'🔊'}</button>
+          <button onclick="app.toggleBGM()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="背景音乐">${this.bgm && this.bgm.state === 'running'?'🔇':'🔊'}</button>
           <span class="bg-white/20 px-2 py-1 rounded-full text-xs">📚 ${units.length}单元</span>
           <span class="bg-white/20 px-2 py-1 rounded-full text-xs">🔥 ${streak}天</span>
           <button onclick="app.convertXP()" class="bg-yellow-400/90 px-2 py-1 rounded-full text-xs btn-press font-bold" title="点击将50 XP转换为1颗星星">⭐ ${xp} XP</button>
@@ -1868,6 +1893,11 @@ class App {
       backpack.push(backpackItem);
       save('backpack', backpack);
       
+      // 背景音乐购买后立即设置过期时间
+      if (item.type === 'music') {
+        save('bgmExpireTime', Date.now() + 24 * 60 * 60 * 1000);
+      }
+      
       let savedItems = load('savedItems', []);
       savedItems = savedItems.filter(id => id !== itemId);
       save('savedItems', savedItems);
@@ -1949,7 +1979,7 @@ class App {
       }
     } else {
       if (bp.type === 'music') {
-        const isPlaying = this.bgm && !this.bgm.paused;
+        const isPlaying = this.bgm && this.bgm.state === 'running';
         buttonsHTML = `
           <button onclick="app.toggleBGM()" class="bg-${isPlaying ? 'red' : 'green'}-500 text-white px-3 py-1 rounded-lg text-xs btn-press font-bold">${isPlaying ? '暂停' : '播放'}</button>
         `;
