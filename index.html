@@ -1475,6 +1475,8 @@ class App {
       </div>
     </header>
     <main class="max-w-lg mx-auto px-4 py-6">
+      ${this.backpackHTML()}
+
       <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 mb-4">
         <div class="flex items-center gap-2">
           <span class="text-yellow-500 text-xl">⭐</span>
@@ -1643,33 +1645,163 @@ class App {
     if (!item) return;
     
     this.buyItem(item.price, itemId, () => {
-      this.applyDailyItem(item);
+      // 存入背包
+      let backpack = load('backpack', []);
+      const backpackItem = {
+        ...item,
+        boughtAt: Date.now(),
+        id: item.id + '_' + Date.now() // 唯一ID
+      };
+      backpack.push(backpackItem);
+      save('backpack', backpack);
+      
       let savedItems = load('savedItems', []);
       savedItems = savedItems.filter(id => id !== itemId);
       save('savedItems', savedItems);
-      this.showToast(`🎉 购买成功！${item.desc}`, 'success');
+      this.showToast(`🎒 已放入背包：${item.name}`, 'success');
       this.render();
     });
   }
 
-  applyDailyItem(item) {
-    switch(item.type) {
+  backpackHTML() {
+    const backpack = load('backpack', []);
+    
+    if (backpack.length === 0) {
+      return `
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 mb-4">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-xl">🎒</span>
+            <h3 class="font-bold text-gray-800 dark:text-gray-100">我的背包</h3>
+          </div>
+          <p class="text-gray-400 dark:text-gray-500 text-sm text-center py-4">背包空空如也~</p>
+        </div>`;
+    }
+
+    return `
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 mb-4">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xl">🎒</span>
+          <h3 class="font-bold text-gray-800 dark:text-gray-100">我的背包</h3>
+          <span class="ml-auto text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">${backpack.length}件</span>
+        </div>
+        <div class="space-y-2 max-h-60 overflow-y-auto">
+          ${backpack.map(bp => this.backpackItemHTML(bp)).join('')}
+        </div>
+      </div>`;
+  }
+
+  backpackItemHTML(bp) {
+    const isTheme = bp.type.startsWith('theme_');
+    const now = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    
+    let statusHTML = '';
+    if (isTheme && bp.usedAt) {
+      const expireTime = bp.usedAt + oneDayMs;
+      const remaining = expireTime - now;
+      if (remaining > 0) {
+        const hours = Math.floor(remaining / (60 * 60 * 1000));
+        statusHTML = `<span class="text-xs text-green-500">使用中 (${hours}小时后过期)</span>`;
+      } else {
+        statusHTML = `<span class="text-xs text-gray-400">已过期</span>`;
+      }
+    }
+
+    return `
+      <div class="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 rounded-xl p-3">
+        <div class="text-2xl">${bp.icon}</div>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-sm text-gray-800 dark:text-gray-100 truncate">${bp.name}</div>
+          <div class="text-xs text-gray-400">${bp.desc}</div>
+          ${statusHTML}
+        </div>
+        <div class="flex gap-1">
+          <button onclick="app.useBackpackItem('${bp.id}')" class="bg-green-500 text-white px-3 py-1 rounded-lg text-xs btn-press font-bold">使用</button>
+          <button onclick="app.removeBackpackItem('${bp.id}')" class="bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-lg text-xs btn-press">🗑️</button>
+        </div>
+      </div>`;
+  }
+
+  useBackpackItem(itemId) {
+    let backpack = load('backpack', []);
+    const bpIndex = backpack.findIndex(bp => bp.id === itemId);
+    if (bpIndex === -1) return;
+    
+    const bp = backpack[bpIndex];
+    const isTheme = bp.type.startsWith('theme_');
+    
+    // 主题商品：标记使用时间，一天后过期
+    if (isTheme) {
+      const now = Date.now();
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      
+      // 检查是否已过期
+      if (bp.usedAt && (now - bp.usedAt) >= oneDayMs) {
+        // 已过期，从背包移除
+        backpack.splice(bpIndex, 1);
+        save('backpack', backpack);
+        this.showToast('⏰ 主题已过期，已从背包移除', 'error');
+        this.render();
+        return;
+      }
+      
+      // 使用主题
+      bp.usedAt = bp.usedAt || now; // 首次使用记录时间
+      save('backpack', backpack);
+      
+      // 应用主题
+      const themeMap = {
+        'theme_rainbow': 'rainbow',
+        'theme_night': 'night',
+        'theme_sakura': 'sakura',
+        'theme_ocean': 'ocean',
+        'theme_fire': 'fire',
+        'theme_forest': 'forest',
+        'theme_snow': 'snow',
+        'theme_lucky': 'lucky',
+        'theme_art': 'art',
+        'theme_starlight': 'starlight',
+        'theme_candy': 'candy',
+        'theme_butterfly': 'butterfly',
+        'theme_mushroom': 'mushroom',
+        'theme_circus': 'circus',
+        'theme_space': 'space',
+      };
+      const theme = themeMap[bp.type] || 'default';
+      save('activeTheme', theme);
+      this.showToast(`🎨 已应用${bp.name}！(有效期24小时)`, 'success');
+    } else {
+      // 非主题商品：立即使用并从背包移除
+      this.applyBackpackItem(bp);
+      backpack.splice(bpIndex, 1);
+      save('backpack', backpack);
+    }
+    
+    this.render();
+  }
+
+  applyBackpackItem(bp) {
+    switch(bp.type) {
       case 'random':
         const rand = Math.random();
         if (rand < 0.3) {
           let hearts = load('gameHearts', 5);
           hearts += 3;
           save('gameHearts', hearts);
+          this.showToast('🎁 获得爱心+3！', 'success');
         } else if (rand < 0.6) {
           let stars = load('stars', 0);
           stars += 5;
           save('stars', stars);
+          this.showToast('🎁 获得星星+5！', 'success');
         } else {
           save('doubleStars', true);
+          this.showToast('🎁 获得双倍星星！', 'success');
         }
         break;
       case 'tripleStars':
         save('tripleStars', 3);
+        this.showToast('🌟 接下来3关星星翻倍！', 'success');
         break;
       case 'maxHeartPlus':
         let maxHearts = load('maxHearts', 5);
@@ -1678,77 +1810,43 @@ class App {
         let curHearts = load('gameHearts', 5);
         curHearts++;
         save('gameHearts', curHearts);
+        this.showToast('💖 永久爱心+1！', 'success');
         break;
       case 'starBonus':
         let stars = load('stars', 0);
         stars += 5;
         save('stars', stars);
+        this.showToast('💎 获得5颗星星！', 'success');
         break;
       case 'timeBonus':
         save('timeBonus', true);
+        this.showToast('⏰ 下一关答题时间+30秒！', 'success');
         break;
       case 'badge':
         let badges = load('badges', []);
-        badges.push(item.id);
+        badges.push(bp.id);
         save('badges', badges);
+        this.showToast('🏆 解锁荣誉徽章！', 'success');
         break;
-      case 'theme_rainbow':
-        save('activeTheme', 'rainbow');
-        break;
-      case 'theme_night':
-        save('activeTheme', 'night');
-        break;
-      case 'theme_sakura':
-        save('activeTheme', 'sakura');
-        break;
-      case 'theme_ocean':
-        save('activeTheme', 'ocean');
-        break;
-      case 'theme_fire':
-        save('activeTheme', 'fire');
-        break;
-      case 'theme_forest':
-        save('activeTheme', 'forest');
-        break;
-      case 'theme_snow':
-        save('activeTheme', 'snow');
-        break;
-      case 'theme_lucky':
-        save('activeTheme', 'lucky');
-        break;
-      case 'theme_art':
-        save('activeTheme', 'art');
-        break;
-      case 'theme_starlight':
-        save('activeTheme', 'starlight');
-        break;
-      case 'theme_candy':
-        save('activeTheme', 'candy');
-        break;
-      case 'theme_butterfly':
-        save('activeTheme', 'butterfly');
-        break;
-      case 'theme_mushroom':
-        save('activeTheme', 'mushroom');
-        break;
-      case 'theme_circus':
-        save('activeTheme', 'circus');
-        break;
-      case 'theme_space':
-        save('activeTheme', 'space');
+      case 'extraWords':
+        this.showToast('📖 单词扩展包已激活！', 'success');
         break;
       case 'music':
-        save('bgMusic', true);
+        this.showToast('🎵 背景音乐已解锁！', 'success');
         break;
       case 'easier':
         save('easierMode', true);
-        break;
-      case 'extraWords':
-        let extraCount = load('extraWordsCount', 0);
-        extraCount += 10;
-        save('extraWordsCount', extraCount);
+        this.showToast('🎯 下一关更容易答对！', 'success');
         break;
     }
+  }
+
+  removeBackpackItem(itemId) {
+    let backpack = load('backpack', []);
+    backpack = backpack.filter(bp => bp.id !== itemId);
+    save('backpack', backpack);
+    this.showToast('🗑️ 已丢弃', 'success');
+    this.render();
   }
 
   buyHeart() {
