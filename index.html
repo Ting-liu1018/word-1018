@@ -2163,9 +2163,16 @@ class App {
 
   removeBackpackItem(itemId) {
     let backpack = load('backpack', []);
+    const item = backpack.find(bp => bp.id === itemId);
+    if (item && item.price) {
+      const stars = load('stars', 0);
+      save('stars', stars + item.price);
+      this.showToast(`🗑️ 已丢弃，退回 ${item.price} ⭐`, 'success');
+    } else {
+      this.showToast('🗑️ 已丢弃', 'success');
+    }
     backpack = backpack.filter(bp => bp.id !== itemId);
     save('backpack', backpack);
-    this.showToast('🗑️ 已丢弃', 'success');
     this.render();
   }
 
