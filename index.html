@@ -1893,9 +1893,10 @@ class App {
       backpack.push(backpackItem);
       save('backpack', backpack);
       
-      // 背景音乐购买后立即设置过期时间
+      // 背景音乐购买后立即播放
       if (item.type === 'music') {
         save('bgmExpireTime', Date.now() + 24 * 60 * 60 * 1000);
+        this.startBackgroundMusic();
       }
       
       let savedItems = load('savedItems', []);
