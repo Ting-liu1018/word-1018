@@ -1277,22 +1277,37 @@ class App {
         if (data[0]) {
           const entry = data[0];
           const phonetic = entry.phonetic || entry.phonetics?.[0]?.text || '';
-          const meaning = entry.meanings?.[0]?.definitions?.[0]?.definition || '';
+          const enMeaning = entry.meanings?.[0]?.definitions?.[0]?.definition || '';
           const example = entry.meanings?.[0]?.definitions?.[0]?.example || '';
           const pos = entry.meanings?.[0]?.partOfSpeech || '';
           
-          this.search.results = [{
-            w: entry.word,
-            p: phonetic,
-            m: meaning,
-            ex: example,
-            pos: pos,
-            rule: '在线查询单词',
-            parts: this.splitSyllables(entry.word),
-            tips: '在线词典查询结果',
-            unit: { name: '在线查询', icon: '🌐', title: 'Online Dictionary' }
-          }];
-          this.render();
+          this.translateToChinese(enMeaning).then(zhMeaning => {
+            this.search.results = [{
+              w: entry.word,
+              p: phonetic,
+              m: zhMeaning || enMeaning,
+              ex: example,
+              pos: pos,
+              rule: '在线查询单词',
+              parts: this.splitSyllables(entry.word),
+              tips: '在线词典查询结果',
+              unit: { name: '在线查询', icon: '🌐', title: 'Online Dictionary' }
+            }];
+            this.render();
+          }).catch(() => {
+            this.search.results = [{
+              w: entry.word,
+              p: phonetic,
+              m: enMeaning,
+              ex: example,
+              pos: pos,
+              rule: '在线查询单词',
+              parts: this.splitSyllables(entry.word),
+              tips: '在线词典查询结果',
+              unit: { name: '在线查询', icon: '🌐', title: 'Online Dictionary' }
+            }];
+            this.render();
+          });
         }
       })
       .catch(() => {
@@ -1309,6 +1324,20 @@ class App {
         }];
         this.render();
       });
+  }
+
+  translateToChinese(text) {
+    if (!text) return Promise.resolve('');
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=${encodeURIComponent(text)}`;
+    return fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data[0] && data[0][0] && data[0][0][0]) {
+          return data[0][0][0];
+        }
+        return '';
+      })
+      .catch(() => '');
   }
 
   splitSyllables(word) {
