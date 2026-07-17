@@ -805,6 +805,50 @@ class App {
     }
   }
 
+  startBackgroundMusic() {
+    if (this.bgm) {
+      this.bgm.pause();
+      this.bgm = null;
+    }
+    
+    const bgmUrl = 'https://cdn.pixabay.com/audio/2022/03/28/audio_1f65b6302f.mp3';
+    this.bgm = new Audio(bgmUrl);
+    this.bgm.loop = true;
+    this.bgm.volume = 0.3;
+    this.bgm.play().catch(() => {
+      this.showToast('🔊 点击页面后自动播放音乐', 'info');
+    });
+
+    save('bgmExpireTime', Date.now() + 24 * 60 * 60 * 1000);
+  }
+
+  checkBGMStatus() {
+    const expireTime = load('bgmExpireTime', 0);
+    if (expireTime > Date.now() && !this.bgm) {
+      this.startBackgroundMusic();
+    }
+  }
+
+  toggleBGM() {
+    if (this.bgm) {
+      if (this.bgm.paused) {
+        this.bgm.play();
+        this.showToast('🎵 背景音乐已开启', 'success');
+      } else {
+        this.bgm.pause();
+        this.showToast('🔇 背景音乐已暂停', 'success');
+      }
+    } else {
+      const expireTime = load('bgmExpireTime', 0);
+      if (expireTime > Date.now()) {
+        this.startBackgroundMusic();
+      } else {
+        this.showToast('🎵 背景音乐已过期，请前往商店购买', 'error');
+      }
+    }
+    this.render();
+  }
+
   html() {
     switch(this.page) {
       case 'home': return this.homeHTML();
@@ -849,6 +893,7 @@ class App {
         <div class="flex items-center gap-2 text-sm">
           <button onclick="app.toggleDark()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="深色模式">${this.dark?'☀️':'🌙'}</button>
           <button onclick="app.toggleVoice()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="切换发音模式">${this.childVoice?'👶':'🔊'}</button>
+          <button onclick="app.toggleBGM()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="背景音乐">${this.bgm?'🔇':'🔊'}</button>
           <span class="bg-white/20 px-2 py-1 rounded-full text-xs">📚 ${units.length}单元</span>
           <span class="bg-white/20 px-2 py-1 rounded-full text-xs">🔥 ${streak}天</span>
           <button onclick="app.convertXP()" class="bg-yellow-400/90 px-2 py-1 rounded-full text-xs btn-press font-bold" title="点击将50 XP转换为1颗星星">⭐ ${xp} XP</button>
@@ -2050,7 +2095,8 @@ class App {
         this.showToast('📖 单词扩展包已激活！', 'success');
         break;
       case 'music':
-        this.showToast('🎵 背景音乐已解锁！', 'success');
+        this.startBackgroundMusic();
+        this.showToast('🎵 背景音乐已播放！', 'success');
         break;
       case 'easier':
         save('easierMode', true);
