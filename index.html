@@ -811,25 +811,25 @@ class App {
       this.bgm = null;
     }
     
-    const bgmUrls = [
-      'https://cdn.pixabay.com/audio/2022/03/28/audio_1f65b6302f.mp3',
-      'https://assets.mixkit.co/music/preview/mixkit-forest-treasure-1389.mp3',
-      'https://assets.mixkit.co/music/preview/mixkit-happy-life-23.mp3'
-    ];
-    const bgmUrl = bgmUrls[Math.floor(Math.random() * bgmUrls.length)];
+    const bgmUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
     this.bgm = new Audio(bgmUrl);
     this.bgm.loop = true;
     this.bgm.volume = 0.3;
+    this.bgm.crossOrigin = 'anonymous';
     
-    const playMusic = () => {
+    this.bgm.addEventListener('loadeddata', () => {
       this.bgm.play().then(() => {
         this.showToast('🎵 背景音乐已播放！', 'success');
-      }).catch(() => {
-        this.showToast('🔊 请点击页面任意位置开启音乐', 'info');
+      }).catch(e => {
+        console.error('BGM play error:', e);
+        this.showToast('🔊 请点击页面开启音乐', 'info');
       });
-    };
+    });
     
-    playMusic();
+    this.bgm.addEventListener('error', (e) => {
+      console.error('BGM load error:', e);
+      this.showToast('❌ 音乐加载失败', 'error');
+    });
 
     save('bgmExpireTime', Date.now() + 24 * 60 * 60 * 1000);
   }
