@@ -937,7 +937,7 @@ class App {
           <button onclick="app.toggleBGM()" class="bg-white/20 px-2 py-1 rounded-full btn-press text-sm" title="背景音乐">${this.bgm && this.bgm.state === 'running'?'🔇':'🔊'}</button>
           <span class="bg-white/20 px-2 py-1 rounded-full text-xs">📚 ${units.length}单元</span>
           <span class="bg-white/20 px-2 py-1 rounded-full text-xs">🔥 ${streak}天</span>
-          <button onclick="app.convertXP()" class="bg-yellow-400/90 px-2 py-1 rounded-full text-xs btn-press font-bold" title="点击将50 XP转换为1颗星星">⭐ ${xp} XP</button>
+          <button onclick="app.convertXP()" class="bg-yellow-400/90 px-2 py-1 rounded-full text-xs btn-press font-bold" title="点击将10 XP转换为1颗星星">⭐ ${xp} XP</button>
         </div>
       </div>
     </header>
@@ -1047,19 +1047,19 @@ class App {
 
   convertXP() {
     let xp = load('xp', 0);
-    if (xp < 50) {
-      this.showToast(`⭐ XP不足50，无法转换（当前${xp}）`, 'error');
+    if (xp < 10) {
+      this.showToast(`⭐ XP不足10，无法转换（当前${xp}）`, 'error');
       return;
     }
-    const convertCount = Math.floor(xp / 50);
-    xp -= convertCount * 50;
+    const convertCount = Math.floor(xp / 10);
+    xp -= convertCount * 10;
     save('xp', xp);
 
     let stars = load('stars', 0);
     stars += convertCount;
     save('stars', stars);
 
-    this.showToast(`🎉 已将 ${convertCount * 50} XP 转换为 ${convertCount} 颗星星！`, 'success');
+    this.showToast(`🎉 已将 ${convertCount * 10} XP 转换为 ${convertCount} 颗星星！`, 'success');
     this.render();
   }
 
