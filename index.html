@@ -2670,6 +2670,21 @@ class App {
   gameResultHTML(q) {
     const g = this.game;
     const msg = g.result ? cheers[Math.floor(Math.random()*cheers.length)] : oops[Math.floor(Math.random()*oops.length)];
+
+    if (!g.result && g.hearts > 0) {
+      return `
+        <div class="slide-up">
+          <div class="${g.result?'bg-green-50 dark:bg-green-900/20':'bg-red-50 dark:bg-red-900/20'} rounded-2xl p-6 text-center mb-4">
+            <div class="text-5xl mb-2 ${g.result?'':'shake'}">${g.result?'✅':'❌'} ${g.result && g.combo>=3?'<span class="sparkle">✨</span>':''}</div>
+            <h2 class="text-xl font-bold ${g.result?'text-green-600 dark:text-green-400':'text-red-500 dark:text-red-400'}">${msg}</h2>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">正确答案：<span class="font-bold text-green-600 dark:text-green-400">${q.word.w}</span></p>
+            <p class="text-xs text-gray-500 dark:text-gray-500 mt-1">${q.word.w} - ${q.word.m}</p>
+          </div>
+          <button onclick="app.retryQuestion()" class="bg-yellow-500 text-white px-8 py-3 rounded-xl font-bold btn-press w-full mb-2">🔄 重试此题</button>
+          <button onclick="app.nextQuestion()" class="bg-green-500 text-white px-8 py-3 rounded-xl font-bold btn-press w-full">跳过 →</button>
+        </div>`;
+    }
+
     return `
       <div class="slide-up">
         <div class="${g.result?'bg-green-50 dark:bg-green-900/20':'bg-red-50 dark:bg-red-900/20'} rounded-2xl p-6 text-center mb-4">
@@ -2680,6 +2695,13 @@ class App {
         </div>
         <button onclick="app.nextQuestion()" class="bg-green-500 text-white px-8 py-3 rounded-xl font-bold btn-press w-full">继续 → <span class="text-xs opacity-70">(按回车)</span></button>
       </div>`;
+  }
+
+  retryQuestion() {
+    const g = this.game;
+    g.result = null;
+    this.prepareQuestion();
+    this.render();
   }
 
   answer(w) {
@@ -2734,27 +2756,18 @@ class App {
           q.matched.forEach(w=>this.saveWP(w, true));
         }
       } else {
-        // Wrong match — show feedback but don't lose hearts immediately
+        // Wrong match — 扣一颗爱心
         q.matchWrong = true;
         q.selLeft = null;
         q.selRight = null;
-        // Still track wrong but less punishing
         this.game.combo = 0;
-        // 配对题错3次扣星或扣心
-        if (!q._wrongCount) q._wrongCount = 0;
-        q._wrongCount++;
-        if (q._wrongCount >= 3) {
-          let stars = load('stars', 0);
-          if (stars > 0) {
-            stars--;
-            save('stars', stars);
-            this.showToast('⭐ 配对错误3次！扣除1颗星星', 'error');
-          } else {
-            this.game.hearts--;
-            this.showToast('💔 配对错误3次！爱心不足', 'error');
-          }
-          q._wrongCount = 0;
-        }
+        this.game.hearts--;
+        save('gameHearts', this.game.hearts);
+        let heartLostTime = load('heartLostTime', []);
+        heartLostTime.push(Date.now());
+        save('heartLostTime', heartLostTime);
+        this.showToast('💔 配对错误！爱心-1', 'error');
+        q.matched.forEach(w=>this.saveWP(w, false));
       }
     }
     this.render();
