@@ -1460,6 +1460,8 @@ class App {
     const items = [
       { id:'heart', name:'❤️ 爱心', icon:'❤️', price:1, desc:'恢复1颗爱心，继续闯关！', action:'buyHeart' },
       { id:'hearts', name:'❤️❤️ 爱心x3', icon:'❤️❤️❤️', price:2, desc:'恢复3颗爱心，畅玩不停！', action:'buyHearts' },
+      { id:'star', name:'⭐ 星星', icon:'⭐', price:2, desc:'恢复1颗星星，答题不扣心！', action:'buyStar' },
+      { id:'stars', name:'⭐⭐ 星星x5', icon:'⭐⭐⭐', price:8, desc:'恢复5颗星星，畅玩无忧！', action:'buyStars' },
       { id:'hint', name:'💡 提示卡', icon:'💡', price:3, desc:'闯关时可以获得1次提示', action:'buyHint' },
       { id:'double', name:'⭐ 双倍星星', icon:'⭐⭐', price:5, desc:'下一关获得双倍星星奖励', action:'buyDouble' },
     ];
@@ -1863,6 +1865,26 @@ class App {
       this.game.hearts = (this.game.hearts || 0) + 3;
       save('gameHearts', this.game.hearts);
       this.showToast('❤️❤️❤️ 购买成功！已恢复3颗爱心', 'success');
+      this.render();
+    });
+  }
+
+  buyStar() {
+    this.buyItem(2, 'star', () => {
+      let stars = load('stars', 0);
+      stars++;
+      save('stars', stars);
+      this.showToast('⭐ 购买成功！已恢复1颗星星', 'success');
+      this.render();
+    });
+  }
+
+  buyStars() {
+    this.buyItem(8, 'stars', () => {
+      let stars = load('stars', 0);
+      stars += 5;
+      save('stars', stars);
+      this.showToast('⭐⭐⭐ 购买成功！已恢复5颗星星', 'success');
       this.render();
     });
   }
@@ -2477,7 +2499,16 @@ class App {
       g.xp += 10 + Math.min(g.combo-1, 5) * 2;
     } else {
       g.combo = 0;
-      g.hearts--;
+      // 优先扣星星，星星为0则扣爱心
+      let stars = load('stars', 0);
+      if (stars > 0) {
+        stars--;
+        save('stars', stars);
+        this.showToast('⭐ 答错了！扣除1颗星星', 'error');
+      } else {
+        g.hearts--;
+        this.showToast('💔 答错了！爱心不足', 'error');
+      }
       g.wrongWords.push(g.curr.word.w);
     }
     this.saveWP(g.curr.word.w, correct);
@@ -2516,11 +2547,19 @@ class App {
         q.selRight = null;
         // Still track wrong but less punishing
         this.game.combo = 0;
-        // Only lose heart after 2 wrong attempts
+        // 配对题错3次扣星或扣心
         if (!q._wrongCount) q._wrongCount = 0;
         q._wrongCount++;
         if (q._wrongCount >= 3) {
-          this.game.hearts--;
+          let stars = load('stars', 0);
+          if (stars > 0) {
+            stars--;
+            save('stars', stars);
+            this.showToast('⭐ 配对错误3次！扣除1颗星星', 'error');
+          } else {
+            this.game.hearts--;
+            this.showToast('💔 配对错误3次！爱心不足', 'error');
+          }
           q._wrongCount = 0;
         }
       }
